@@ -1,0 +1,93 @@
+﻿#pragma kernel PBD
+#define POINT_AMOUNT 1024
+
+struct PBDPointInfo
+{
+     bool valid;
+     float mass;
+     bool collided;
+     float radius;
+};
+
+struct PBDConnectionInfo
+{
+    int pointIndex;
+    float stiffness;
+    float distance;
+};
+
+RWStructuredBuffer<PBDPointInfo> _pointsDataBuffer;
+RWStructuredBuffer<float3> _positionBuffer;
+RWStructuredBuffer<float3> _velocityBuffer;
+RWStructuredBuffer<float3> _tempPositionBuffer;
+RWStructuredBuffer<PBDConnectionInfo> _connectionDataBuffer;
+
+int _connectionAmount;
+int _solverSteps;
+
+float _deltaTime;
+float _prevDeltaTime;
+bool _useGravity;
+float _velocityDamping;
+float _collisionStiffness;
+ 
+[numthreads(POINT_AMOUNT,1,1)]
+void PBD (uint3 id : SV_DispatchThreadID)
+{
+    if (_pointsDataBuffer[id.x].valid)
+    {
+        _velocityBuffer[id.x] = float3(0,0,0);
+        if (_prevDeltaTime > 0) // обрабатываем инфу с предыдущего кадра
+        { 
+            _velocityBuffer[id.x] = (_tempPositionBuffer[id.x] - _positionBuffer[id.x]) / _prevDeltaTime;
+        }
+        _positionBuffer[id.x] = _tempPositionBuffer[id.x];
+        
+        
+        if (_useGravity) 
+        {
+            _velocityBuffer[id.x] += _pointsDataBuffer[id.x].mass * 9.8 * _deltaTime * float3(0, -1, 0);
+        }
+        _velocityBuffer[id.x] *= _velocityDamping;
+        _tempPositionBuffer[id.x] = _positionBuffer[id.x] + _deltaTime * _velocityBuffer[id.x];
+        
+        GroupMemoryBarrierWithGroupSync();
+
+        for (int solverStep = 0; solverStep < _solverSteps; solverStep ++)
+        {
+            for (int i = 0; i < _connectionAmount; i++)
+            {
+                int connectedPointIndex = _connectionDataBuffer[id.x * _connectionAmount + i].pointIndex;
+                if (connectedPointIndex != -1)
+                {
+                    float currentDistance = length(_tempPositionBuffer[connectedPointIndex] - _tempPositionBuffer[id.x]);
+                    float initialDistance = _connectionDataBuffer[id.x * _connectionAmount + i].distance;
+                    if (currentDistance > _pointsDataBuffer[id.x].radius + _pointsDataBuffer[i].radius)
+                    {
+                        float stretchingStiffness = _connectionDataBuffer[id.x * _connectionAmount + i].stiffness;
+                        float3 dir = (currentDistance - initialDistance) / currentDistance *
+                                      (_tempPositionBuffer[id.x] - _tempPositionBuffer[connectedPointIndex]);
+                        float k = _pointsDataBuffer[id.x].mass / (_pointsDataBuffer[id.x].mass + _pointsDataBuffer[connectedPointIndex].mass);
+                        _tempPositionBuffer[id.x] -= k * stretchingStiffness * dir;
+                    }
+                }
+            }
+            for (uint j = 0; j < POINT_AMOUNT; j ++)
+            {
+                if (_pointsDataBuffer[j].valid && j != id.x)
+                {
+                    float currentDistance = length(_tempPositionBuffer[j] - _tempPositionBuffer[id.x]);
+                    float desiredDistance = _pointsDataBuffer[id.x].radius + _pointsDataBuffer[j].radius;
+                    if (currentDistance < desiredDistance)
+                    {
+                        float3 dir = (currentDistance - desiredDistance) / currentDistance * (_tempPositionBuffer[id.x] - _tempPositionBuffer[j]);
+                        float k = _pointsDataBuffer[id.x].mass / (_pointsDataBuffer[id.x].mass + _pointsDataBuffer[j].mass);
+                        _tempPositionBuffer[id.x] -= k * _collisionStiffness * dir;
+                    }
+                }
+            }
+            GroupMemoryBarrierWithGroupSync();
+        }
+    }
+    GroupMemoryBarrierWithGroupSync();
+}
