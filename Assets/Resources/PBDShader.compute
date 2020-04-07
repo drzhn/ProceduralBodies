@@ -21,6 +21,11 @@ RWStructuredBuffer<float3> _positionBuffer;
 RWStructuredBuffer<float3> _velocityBuffer;
 RWStructuredBuffer<float3> _tempPositionBuffer;
 RWStructuredBuffer<PBDConnectionInfo> _connectionDataBuffer;
+RWStructuredBuffer<int> _neighboursUnitBuffer; // тут мы будем хранить вторую часть юнита каждой точки. L = POINT_AMOUNT
+RWStructuredBuffer<int> _neighboursBuffer; // тут мы будем хранить ближайшего соседа каждой точки (исключая ближайшую из юнита)
+
+
+
 
 int _connectionAmount;
 int _solverSteps;

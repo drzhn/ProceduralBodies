@@ -7,6 +7,9 @@
 /[Oo]bj/
 /[Bb]uild/
 /[Bb]uilds/
+/[Bb]uildAdmin/
+/[Bb]uildRelease/
+/ExportData/
 /[Ll]ogs/
 /[Uu]ser[Ss]ettings/
 
@@ -62,3 +65,5 @@ sysinfo.txt
 
 # Crashlytics generated file
 crashlytics-build.properties
+*.zip
+*.db

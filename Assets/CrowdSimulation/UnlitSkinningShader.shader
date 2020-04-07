@@ -24,6 +24,7 @@
             struct appdata
             {
                 float4 vertex : POSITION;
+                float3 normal : NORMAL;
                 float2 uv : TEXCOORD0;
                 uint id : SV_VertexID;
             };
@@ -33,6 +34,7 @@
                 float2 uv : TEXCOORD0;
                 UNITY_FOG_COORDS(1)
                 float4 vertex : SV_POSITION;
+                float3 normal : NORMAL;
             };
 
             sampler2D _MainTex;
@@ -65,7 +67,15 @@
                
                 o.vertex = mul(UNITY_MATRIX_VP, vec);
                 
-                //o.vertex = UnityObjectToClipPos(vec);
+                float4 nor = float4(v.normal, 1);
+                nor =
+                    mul(_BonesMatrices[boneIndex0],v.normal) * boneWeight0 +
+                    mul(_BonesMatrices[boneIndex1],v.normal) * boneWeight1 +
+                    mul(_BonesMatrices[boneIndex2],v.normal) * boneWeight2 +
+                    mul(_BonesMatrices[boneIndex3],v.normal) * boneWeight3;
+               
+                o.normal =nor;
+
                 o.uv = TRANSFORM_TEX(v.uv, _MainTex);
                 UNITY_TRANSFER_FOG(o,o.vertex);
                 return o;
@@ -74,7 +84,8 @@
             fixed4 frag (v2f i) : SV_Target
             {
                 // sample the texture
-                fixed4 col = tex2D(_MainTex, i.uv);
+                //fixed4 col = tex2D(_MainTex, i.uv);
+                fixed4 col = fixed4( i.normal,1);
                 // apply fog
                 UNITY_APPLY_FOG(i.fogCoord, col);
                 return col;

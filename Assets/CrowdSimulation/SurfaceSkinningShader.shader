@@ -13,7 +13,7 @@
         LOD 200
 
         CGPROGRAM
-        #pragma surface surf BasicDiffuse fullforwardshadows vertex:vert
+        #pragma surface surf Standard fullforwardshadows addshadow vertex:vert
 
         #pragma target 5.0
         #pragma only_renderers d3d11
@@ -32,25 +32,15 @@
             float4 texcoord : TEXCOORD0;
             float4 texcoord1 : TEXCOORD1;
             float4 texcoord2 : TEXCOORD2;
-            uint id : SV_VertexID;
+            uint vertexId : SV_VertexID;
+            UNITY_VERTEX_INPUT_INSTANCE_ID
+            uint instanceId : SV_InstanceID;
             float4 tangent: TANGENT;
          };
+        
         struct Input
         {
             float2 uv_MainTex;
-            float3 worldPos;
-        };
-        
-        struct SurfaceOutputCustom
-        {
-            fixed3 Albedo;      // base (diffuse or specular) color
-            fixed3 Normal;      // tangent space normal, if written
-            half3 Emission;
-            half Metallic;      // 0=non-metal, 1=metal
-            half Smoothness;    // 0=rough, 1=smooth
-            half Occlusion;     // occlusion (default 1)
-            fixed Alpha;        // alpha for transparencies
-            float3 worldPos;
         };
 
         half _Glossiness;
@@ -60,17 +50,18 @@
         void vert (inout appdata v) {
 
 #ifdef SHADER_API_D3D11
-            uint id = v.id;
+            UNITY_SETUP_INSTANCE_ID(v);
+            uint vertexId = v.vertexId; 
 
-            int boneIndex0 = _VertexBoneIndices[id*4+0];
-            int boneIndex1 = _VertexBoneIndices[id*4+1];
-            int boneIndex2 = _VertexBoneIndices[id*4+2];
-            int boneIndex3 = _VertexBoneIndices[id*4+3];
+            int boneIndex0 = _VertexBoneIndices[vertexId*4+0];
+            int boneIndex1 = _VertexBoneIndices[vertexId*4+1];
+            int boneIndex2 = _VertexBoneIndices[vertexId*4+2];
+            int boneIndex3 = _VertexBoneIndices[vertexId*4+3];
             
-            float boneWeight0 = _VertexWeights[id*4+0];
-            float boneWeight1 = _VertexWeights[id*4+1];
-            float boneWeight2 = _VertexWeights[id*4+2];
-            float boneWeight3 = _VertexWeights[id*4+3];
+            float boneWeight0 = _VertexWeights[vertexId*4+0];
+            float boneWeight1 = _VertexWeights[vertexId*4+1];
+            float boneWeight2 = _VertexWeights[vertexId*4+2];
+            float boneWeight3 = _VertexWeights[vertexId*4+3];
             
             float4 vec = v.vertex;
             vec =
@@ -80,32 +71,35 @@
                 mul(_BonesMatrices[boneIndex3],v.vertex) * boneWeight3;
             
             v.vertex = mul(unity_WorldToObject, vec);
+            
+            float4 nor = float4(v.normal, 1);
+            nor =
+                mul(_BonesMatrices[boneIndex0],v.normal) * boneWeight0 +
+                mul(_BonesMatrices[boneIndex1],v.normal) * boneWeight1 +
+                mul(_BonesMatrices[boneIndex2],v.normal) * boneWeight2 +
+                mul(_BonesMatrices[boneIndex3],v.normal) * boneWeight3;
+               
+            v.normal = nor;
 #endif
         }
         
-        inline float4 LightingBasicDiffuse (SurfaceOutputCustom s, fixed3 lightDir, fixed atten)
-        {
-            float3 normal = normalize(cross(ddx(s.worldPos), ddy(s.worldPos)));
-            float difLight = max(0, dot (normal, lightDir));
-            float4 col;
-            col.rgb = s.Albedo * _LightColor0.rgb * (difLight * atten * 2);
-            col.a = s.Alpha;
-            return col;
-        }
+        
+        // Add instancing support for this shader. You need to check 'Enable Instancing' on materials that use the shader.
+        // See https://docs.unity3d.com/Manual/GPUInstancing.html for more information about instancing.
+        // #pragma instancing_options assumeuniformscaling
+        // UNITY_INSTANCING_BUFFER_START(Props)
+        //     // put more per-instance properties here
+        // UNITY_INSTANCING_BUFFER_END(Props)
 
-
-        void surf (Input IN, inout SurfaceOutputCustom o)
+        void surf (Input IN, inout SurfaceOutputStandard o)
         {
             // Albedo comes from a texture tinted by color
             fixed4 c = tex2D (_MainTex, IN.uv_MainTex) * _Color;
-            o.Albedo = c.rgb;
+            o.Albedo =  c.rgb;
             // Metallic and smoothness come from slider variables
             o.Metallic = _Metallic;
             o.Smoothness = _Glossiness;
             o.Alpha = c.a;
-            o.worldPos = IN.worldPos;
-            //float3 surfaceNormal = normalize(cross(ddx(IN.worldPos.xyz), ddy(IN.worldPos.xyz)));
-            //o.Normal = surfaceNormal;
         }
         ENDCG
     }

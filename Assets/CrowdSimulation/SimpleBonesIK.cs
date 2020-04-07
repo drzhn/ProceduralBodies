@@ -7,13 +7,14 @@ using UnityEngine;
 public class SimpleBonesIK : MonoBehaviour
 {
     [SerializeField] private Transform _pivot;
+    [SerializeField] private BoneOuterDirection _outerDirection;
     [SerializeField] private Transform[] _bones;
     [SerializeField] private AngleLimits[] _angleLimits;
 
     private float _length;
     private Vector3[] _positions; // будем использовать временный массив. для костей в компьют шейдере у нас все равно будут использоваться world координаты, так что поебать 
-    private Vector3[] _initPositions; 
-    private Quaternion[] _rotations;
+    private Vector3[] _initPositions;
+    private Vector3[] _initWorldUpDirections;
     private float[] _distances;
     private int _bonesAmount;
 
@@ -23,16 +24,29 @@ public class SimpleBonesIK : MonoBehaviour
 
         _distances = new float[_bonesAmount];
         _positions = new Vector3[_bonesAmount];
-        _rotations = new Quaternion[_bonesAmount];
         _initPositions = new Vector3[_bonesAmount];
+        _initWorldUpDirections = new Vector3[_bonesAmount];
 
         for (var i = 0; i < _bonesAmount - 1; i++)
         {
             var d = Vector3.Distance(_bones[i].position, _bones[i + 1].position);
             _length += d;
             _distances[i] = d;
-            _rotations[i] = _bones[i].localRotation;
             _initPositions[i] = _bones[i].position;
+            switch (_outerDirection)
+            {
+                case BoneOuterDirection.X:
+                    _initWorldUpDirections[i] = _bones[i].right;
+                    break;
+                case BoneOuterDirection.Y:
+                    _initWorldUpDirections[i] = _bones[i].up;
+                    break;
+                case BoneOuterDirection.Z:
+                    _initWorldUpDirections[i] = _bones[i].forward;
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
         }
 
         _firstBoneIinitDir = _bones[0].right;
@@ -47,10 +61,9 @@ public class SimpleBonesIK : MonoBehaviour
         {
             _positions[i] = _initPositions[i];
         }
+
         for (int k = 0; k < 3; k++)
         {
-
-
             _positions[_bonesAmount - 1] = _pivot.position;
             for (var i = _bonesAmount - 2; i >= 0; i--)
             {
@@ -60,20 +73,27 @@ public class SimpleBonesIK : MonoBehaviour
             _positions[0] = _bones[0].position;
             for (var i = 1; i < _bones.Length; i++)
             {
-                Vector3 dir = (_positions[i] - _positions[i - 1]).normalized; // это -X (world). А где он будет находиться, если мы применим ограничения?
-//                Quaternion rootWorldRotation = LookAtXAxis(dir, _bones[i - 1].up);
-//                Quaternion rootLocalRotation = Quaternion.Inverse(_bones[i - 1].parent.rotation)*rootWorldRotation;
-//                Quaternion clampedRootLocalRotation = ClampRotationAroundAxis(rootLocalRotation, _angleLimits[i - 1]._xLimits, _angleLimits[i - 1]._yLimits, _angleLimits[i - 1]._zLimits);
-//                _bones[i - 1].localRotation = clampedRootLocalRotation;
-//                dir = -_bones[i - 1].right;
+                Vector3 dir = (_positions[i] - _positions[i - 1]).normalized;
                 _positions[i] = _positions[i - 1] + dir * _distances[i - 1];
             }
         }
 
         for (var i = 0; i < _bones.Length - 1; i++)
         {
-            //_bones[i].position = _positions[i];
-            _bones[i].rotation = LookAtXAxis(-(_positions[i] - _positions[i + 1]).normalized, _bones[i].up);
+            switch (_outerDirection)
+            {
+                case BoneOuterDirection.X:
+                    _initWorldUpDirections[i] = _bones[i].right;
+                    break;
+                case BoneOuterDirection.Y:
+                    _bones[i].rotation = LookAtXAxisYUp(-(_positions[i] - _positions[i + 1]).normalized, _initWorldUpDirections[i]);
+                    break;
+                case BoneOuterDirection.Z:
+                    _bones[i].rotation = LookAtXAxisZUp(-(_positions[i] - _positions[i + 1]).normalized,- _initWorldUpDirections[i]);
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
         }
     }
 
@@ -99,13 +119,14 @@ public class SimpleBonesIK : MonoBehaviour
         return q;
     }
 
-    private static Quaternion LookAtXAxis(Vector3 dir, Vector3 up)
+    private static Quaternion LookAtXAxisYUp(Vector3 dir, Vector3 up)
     {
         return Quaternion.LookRotation(dir, up) * Quaternion.Euler(new Vector3(0, 90, 0));
     }
-
-    private void OnDrawGizmos()
+    
+    private static Quaternion LookAtXAxisZUp(Vector3 dir, Vector3 up)
     {
+        return Quaternion.LookRotation(dir, up) * Quaternion.Euler(new Vector3(0, 90, 0)) * Quaternion.Euler(new Vector3(90, 0, 0));
     }
 }
 
@@ -115,4 +136,11 @@ public struct AngleLimits
     public Vector2 _xLimits;
     public Vector2 _yLimits;
     public Vector2 _zLimits;
+}
+
+public enum BoneOuterDirection
+{
+    X,
+    Y,
+    Z
 }
