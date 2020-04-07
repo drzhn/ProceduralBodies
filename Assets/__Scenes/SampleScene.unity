@@ -5788,6 +5788,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d71db138f4faac14f983695f9d606044, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _showAxes: 0
+  _axesLength: 0
   radius: 0.05
   color: {r: 1, g: 0, b: 0, a: 1}
 --- !u!114 &410811729
@@ -11935,6 +11937,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d71db138f4faac14f983695f9d606044, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _showAxes: 0
+  _axesLength: 0
   radius: 0.05
   color: {r: 1, g: 0, b: 0, a: 1}
 --- !u!54 &765299976
@@ -15867,6 +15871,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d71db138f4faac14f983695f9d606044, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _showAxes: 0
+  _axesLength: 0
   radius: 0.05
   color: {r: 1, g: 0, b: 0, a: 1}
 --- !u!114 &1169163438
@@ -23901,6 +23907,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d71db138f4faac14f983695f9d606044, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _showAxes: 0
+  _axesLength: 0
   radius: 0.05
   color: {r: 1, g: 0, b: 0, a: 1}
 --- !u!114 &1815892266
@@ -28733,6 +28741,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d71db138f4faac14f983695f9d606044, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _showAxes: 0
+  _axesLength: 0
   radius: 0.05
   color: {r: 1, g: 0, b: 0, a: 1}
 --- !u!114 &2091010132
