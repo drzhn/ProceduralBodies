@@ -35,6 +35,8 @@ float _prevDeltaTime;
 bool _useGravity;
 float _velocityDamping;
 float _collisionStiffness;
+float _boneStiffness;
+float4 _bonePosition;
  
 [numthreads(POINT_AMOUNT,1,1)]
 void PBD (uint3 id : SV_DispatchThreadID)
@@ -57,9 +59,15 @@ void PBD (uint3 id : SV_DispatchThreadID)
         _tempPositionBuffer[id.x] = _positionBuffer[id.x] + _deltaTime * _velocityBuffer[id.x];
         
         GroupMemoryBarrierWithGroupSync();
-
+        
+        float3 bone = _bonePosition.xyz;
         for (int solverStep = 0; solverStep < _solverSteps; solverStep ++)
         {
+            // Bones calculations
+            float3 dir = _tempPositionBuffer[id.x] - bone;
+            float k = 1;
+            _tempPositionBuffer[id.x] -= k * _boneStiffness * dir;
+            // Connections
             for (int i = 0; i < _connectionAmount; i++)
             {
                 int connectedPointIndex = _connectionDataBuffer[id.x * _connectionAmount + i].pointIndex;
@@ -69,7 +77,7 @@ void PBD (uint3 id : SV_DispatchThreadID)
                     float initialDistance = _connectionDataBuffer[id.x * _connectionAmount + i].distance;
                     if (currentDistance > _pointsDataBuffer[id.x].radius + _pointsDataBuffer[i].radius)
                     {
-                        float stretchingStiffness = _connectionDataBuffer[id.x * _connectionAmount + i].stiffness;
+                        float stretchingStiffness   = _connectionDataBuffer[id.x * _connectionAmount + i].stiffness;
                         float3 dir = (currentDistance - initialDistance) / currentDistance *
                                       (_tempPositionBuffer[id.x] - _tempPositionBuffer[connectedPointIndex]);
                         float k = _pointsDataBuffer[id.x].mass / (_pointsDataBuffer[id.x].mass + _pointsDataBuffer[connectedPointIndex].mass);
@@ -77,6 +85,7 @@ void PBD (uint3 id : SV_DispatchThreadID)
                     }
                 }
             }
+            // Collisions with other points
             for (uint j = 0; j < POINT_AMOUNT; j ++)
             {
                 if (_pointsDataBuffer[j].valid && j != id.x)

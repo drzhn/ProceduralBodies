@@ -200,7 +200,7 @@ namespace PBD
                 oldPositions[i],
                 pointsData[i].radius,
                 (newPositions[i] - oldPositions[i]).normalized,
-                Vector3.Distance(newPositions[i], oldPositions[i]) + 0.001f);
+                Vector3.Distance(newPositions[i], oldPositions[i]) + 0.003f);
         }
     }
 
@@ -219,11 +219,11 @@ namespace PBD
             
             Vector3 oldPoint = oldPositions[i];
             Vector3 newPoint = newPositions[i];
-            Vector3 realCollisionPoint = Hits[i].point + Hits[i].normal * (pointsData[i].radius + 0.001f); 
-            oldPositions[i] = realCollisionPoint + (oldPoint - newPoint).normalized * (0.001f);
+            Vector3 realCollisionPoint = Hits[i].point + Hits[i].normal * (pointsData[i].radius + 0.003f); 
+            oldPositions[i] = realCollisionPoint + (oldPoint - newPoint).normalized * (0.003f);
             newPositions[i] = realCollisionPoint +
                       Vector3.ProjectOnPlane(newPoint - realCollisionPoint, Hits[i].normal) +
-                      Hits[i].normal * (0.001f);
+                      Hits[i].normal * (0.003f);
         }
     }
 

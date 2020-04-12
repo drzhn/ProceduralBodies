@@ -23,6 +23,7 @@ namespace PBD
 
         // Object settings
         private readonly float _pointCollisionStiffness; // when 2 points collide
+        private readonly float _boneStiffness; 
         private readonly float _velocityDamping;
         private readonly bool _useGravity;
 
@@ -51,16 +52,20 @@ namespace PBD
         private NativeArray<RaycastHit> _sphereCastHits; // for results
 
         // connection to bones data
-        // private TransformAccessArray _bones;
+        private Transform _bone;
         // private NativeArray<float> _bonesDistances; // distance between each bone and each point. count = POINTS_AMOUNT * BONES_AMOUNT
         // private NativeArray<bool> _bonesExistence; // array with information if this bone exists (so we don't need to allocate new array when add a new bone)
 
         public PBDObject(
             float pointCollisionStiffness,
+            float boneStiffness,
             float velocityDamping,
-            bool useGravity
+            bool useGravity,
+            Transform bone=null
         )
         {
+            _bone = bone;
+            _boneStiffness = boneStiffness;
             _pointCollisionStiffness = pointCollisionStiffness;
             _velocityDamping = velocityDamping;
             _useGravity = useGravity;
@@ -116,7 +121,7 @@ namespace PBD
             _shader.SetInt("_connectionAmount", CONNECTION_AMOUNT);
             _shader.SetInt("_solverSteps", SOLVER_STEPS);
             _shader.SetFloat("_collisionStiffness", _pointCollisionStiffness);
-            Debug.Log(_pointCollisionStiffness);
+            _shader.SetFloat("_boneStiffness", _boneStiffness);
         }
 
 //        public Vector3 this[int index] => _points[index].p;
@@ -269,6 +274,7 @@ namespace PBD
         {
             _shader.SetFloat("_deltaTime", deltaTime);
             _shader.SetFloat("_prevDeltaTime", _prevDeltaTime);
+            _shader.SetVector("_bonePosition", _bone.position);
             _shader.Dispatch(_shaderKernel, 1, 1, 1);
             _prevDeltaTime = deltaTime;
 

@@ -9,9 +9,11 @@ using UnityEngine.Rendering;
 
 public class PBDCreatorTest : MonoBehaviour
 {
+    [SerializeField] private Transform _bone;
     [Range(0, 1)] [SerializeField] private float _radius;
     [Range(0, 1)] [SerializeField] private float _stiffness;
     [Range(0, 1)] [SerializeField] private float _collisionStiffness;
+    [Range(0, 1)] [SerializeField] private float _boneStiffness;
     [Range(0, 1)] [SerializeField] private float _damping;
     [SerializeField] private bool _useGravity;
 
@@ -24,7 +26,7 @@ public class PBDCreatorTest : MonoBehaviour
     {
         _connections = GetComponentsInChildren<PBDConnectionTest>();
         _points = GetComponentsInChildren<Transform>().Where(x => x != transform).ToDictionary(x => x, x => 0);
-        _pbd = new PBDObject(_collisionStiffness, _damping, _useGravity);
+        _pbd = new PBDObject(_collisionStiffness, _boneStiffness, _damping, _useGravity, _bone);
         foreach (Transform key in _points.Keys.ToList())
         {
             _pbd.AddPoint(key, _radius, 1, out var index);
@@ -34,7 +36,7 @@ public class PBDCreatorTest : MonoBehaviour
         foreach (PBDConnectionTest connection in _connections)
         {
             connection.Radius = _radius;
-            _pbd.AddConnection(_points[connection.transform], _points[connection.connectedPoint], _stiffness);
+//            _pbd.AddConnection(_points[connection.transform], _points[connection.connectedPoint], _stiffness);
         }
 
         _pbd.SetSettings();

@@ -11,7 +11,7 @@ namespace PBD
         public Transform connectedPoint;
         public float Radius { private get; set; }
 
-        private void OnDrawGizmosSelected()
+        private void OnDrawGizmos()
         {
             Color gizmoColor = Gizmos.color;
             Gizmos.color = Color.blue;

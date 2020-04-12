@@ -97,10 +97,8 @@ LightmapSettings:
     m_ExportTrainingData: 0
     m_TrainingDataDestination: TrainingData
     m_LightProbeSampleCountMultiplier: 4
-  m_LightingDataAsset: {fileID: 112000000, guid: 53585a4ef53553944870d97605ffb41f,
-    type: 2}
-  m_LightingSettings: {fileID: 4890085278179872738, guid: c7eb6db582a9a56429384197d0cf261c,
-    type: 2}
+  m_LightingDataAsset: {fileID: 112000000, guid: 53585a4ef53553944870d97605ffb41f, type: 2}
+  m_LightingSettings: {fileID: 4890085278179872738, guid: c7eb6db582a9a56429384197d0cf261c, type: 2}
 --- !u!196 &4
 NavMeshSettings:
   serializedVersion: 2
@@ -120,9 +118,58 @@ NavMeshSettings:
     manualTileSize: 0
     tileSize: 256
     accuratePlacement: 0
+    maxJobWorkers: 0
+    preserveTilesOutsideBounds: 0
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!1 &336323368
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 336323370}
+  - component: {fileID: 336323369}
+  m_Layer: 0
+  m_Name: Bone
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &336323369
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 336323368}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6993cb8d29de41742941cbd1a240f251, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  size: 0.04
+  wired: 0
+  type: 0
+  color: {r: 1, g: 0, b: 0, a: 1}
+--- !u!4 &336323370
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 336323368}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 1.036, z: -0.485}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_RootOrder: 5
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &701937451
 GameObject:
   m_ObjectHideFlags: 0
@@ -591,9 +638,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d20d7d2f20a02ea41b23fdf8bd0ae517, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _radius: 0.206
+  _bone: {fileID: 336323370}
+  _radius: 0.312
   _stiffness: 0.047
   _collisionStiffness: 0.093
+  _boneStiffness: 0.162
   _damping: 0.959
   _useGravity: 1
 --- !u!4 &1727419122
@@ -644,7 +693,7 @@ MeshCollider:
   m_Material: {fileID: 0}
   m_IsTrigger: 0
   m_Enabled: 1
-  serializedVersion: 3
+  serializedVersion: 4
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: 10209, guid: 0000000000000000e000000000000000, type: 0}
@@ -663,6 +712,7 @@ MeshRenderer:
   m_LightProbeUsage: 1
   m_ReflectionProbeUsage: 1
   m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:

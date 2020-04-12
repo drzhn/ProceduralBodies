@@ -2404,7 +2404,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4772830fd8e94a6da44681e5bb89119d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  stretching: 0.008
+  stretching: 0.143
   collisionStretching: 0.27
   bending: 0.04
   boneStiffness: 0.046
