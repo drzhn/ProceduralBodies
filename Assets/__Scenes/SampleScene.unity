@@ -2634,6 +2634,36 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   list: {fileID: 1477107774}
   interpolator: 3
+--- !u!1 &191675907
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 191675908}
+  m_Layer: 0
+  m_Name: Bone (1)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &191675908
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 191675907}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 8.36, y: 0, z: 6.39}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_Children: []
+  m_Father: {fileID: 1449895041}
+  m_RootOrder: 0
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &193060520
 GameObject:
   m_ObjectHideFlags: 0
@@ -13653,6 +13683,36 @@ CapsuleCollider:
   m_Height: 0.6962662
   m_Direction: 0
   m_Center: {x: -0.3869313, y: -0.0000013909313, z: 0.01152387}
+--- !u!1 &922914912
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 922914913}
+  m_Layer: 0
+  m_Name: Bone (2)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &922914913
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 922914912}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: -7.12, y: 0, z: 7.32}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_Children: []
+  m_Father: {fileID: 1449895041}
+  m_RootOrder: 1
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &934831097 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 1309479640788616, guid: 2b38c246cb8994940b8a8be6be2b6f18, type: 3}
@@ -19320,6 +19380,55 @@ Transform:
   m_Father: {fileID: 0}
   m_RootOrder: 13
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1449895039
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1449895041}
+  - component: {fileID: 1449895040}
+  m_Layer: 0
+  m_Name: Bone
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1449895040
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1449895039}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d71db138f4faac14f983695f9d606044, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _showAxes: 0
+  _axesLength: 0
+  radius: 0.33
+  color: {r: 1, g: 0, b: 0, a: 1}
+--- !u!4 &1449895041
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1449895039}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -3.237777, y: 10.26, z: 11.98}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_Children:
+  - {fileID: 191675908}
+  - {fileID: 922914913}
+  m_Father: {fileID: 0}
+  m_RootOrder: 32
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1455174607 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 1436147914580760, guid: 2b38c246cb8994940b8a8be6be2b6f18, type: 3}
@@ -19760,10 +19869,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d20d7d2f20a02ea41b23fdf8bd0ae517, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _rootBone: {fileID: 1449895041}
   _radius: 0.553
   _stiffness: 0.004
-  _collisionStiffness: 0.241
-  _damping: 0.99
+  _collisionStiffness: 0.649
+  _boneStiffness: 0.042
+  _damping: 0.962
   _useGravity: 1
 --- !u!114 &1486022502
 MonoBehaviour:
@@ -19777,7 +19888,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fa12fb1779dde0e47a7cfcb7e5de817e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  amount: 10
+  amount: 8
   prefab: {fileID: 1599715431554231773, guid: 8dd272930594e67458bb4019b7c84856, type: 3}
 --- !u!4 &1486022503
 Transform:

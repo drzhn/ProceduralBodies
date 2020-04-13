@@ -641,10 +641,10 @@ MonoBehaviour:
   _bone: {fileID: 336323370}
   _radius: 0.312
   _stiffness: 0.047
-  _collisionStiffness: 0.093
-  _boneStiffness: 0.162
+  _collisionStiffness: 0.227
+  _boneStiffness: 0.017
   _damping: 0.959
-  _useGravity: 1
+  _useGravity: 0
 --- !u!4 &1727419122
 Transform:
   m_ObjectHideFlags: 0

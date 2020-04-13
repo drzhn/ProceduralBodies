@@ -23,7 +23,7 @@ namespace PBD
 
         // Object settings
         private readonly float _pointCollisionStiffness; // when 2 points collide
-        private readonly float _boneStiffness; 
+        private readonly float _boneStiffness;
         private readonly float _velocityDamping;
         private readonly bool _useGravity;
 
@@ -39,32 +39,50 @@ namespace PBD
         private NativeArray<PBDConnectionInfo> _connectionData; // data containing connection information between points. count = POINTS_AMOUNT * STRETCHING_CAPACITY (2d array repr.)
 
         // compute shader data
-        private ComputeShader _shader;
-        private int _shaderKernel;
-        private ComputeBuffer _pointsDataBuffer;
-        private ComputeBuffer _positionBuffer;
-        private ComputeBuffer _velocityBuffer;
-        private ComputeBuffer _tempPositionBuffer;
-        private ComputeBuffer _connectionDataBuffer;
+        private readonly ComputeShader _shader;
+        private readonly int _shaderKernel;
+        private readonly ComputeBuffer _pointsDataBuffer;
+        private readonly ComputeBuffer _positionBuffer;
+        private readonly ComputeBuffer _velocityBuffer;
+        private readonly ComputeBuffer _tempPositionBuffer;
+        private readonly ComputeBuffer _connectionDataBuffer;
+        private readonly ComputeBuffer _bonesDataBuffer;
 
         // spherecast batching data
         private NativeArray<SpherecastCommand> _sphereCastCommands; // for batching spherecast
         private NativeArray<RaycastHit> _sphereCastHits; // for results
 
         // connection to bones data
-        private Transform _bone;
-        // private NativeArray<float> _bonesDistances; // distance between each bone and each point. count = POINTS_AMOUNT * BONES_AMOUNT
-        // private NativeArray<bool> _bonesExistence; // array with information if this bone exists (so we don't need to allocate new array when add a new bone)
+        private readonly Transform _rootBone;
+        private readonly TransformAccessArray _bones;
+        private readonly NativeArray<PBDBoneInfo> _bonesData;
 
         public PBDObject(
             float pointCollisionStiffness,
             float boneStiffness,
             float velocityDamping,
             bool useGravity,
-            Transform bone=null
+            Transform rootBone
         )
         {
-            _bone = bone;
+            _rootBone = rootBone;
+            var bonesArray = new Transform[_rootBone.childCount + 1];
+            bonesArray[0] = _rootBone;
+            for (int i = 0; i < _rootBone.childCount; i++)
+            {
+                bonesArray[i + 1] = _rootBone.GetChild(i);
+            }
+
+            _bones = new TransformAccessArray(bonesArray);
+            _bonesData = new NativeArray<PBDBoneInfo>(_rootBone.childCount + 1, Allocator.Persistent);
+            _bonesData[0] = new PBDBoneInfo() {position = _rootBone.position, parentIndex = -1};
+            for (var i = 1; i < bonesArray.Length; i++)
+            {
+                _bonesData[i] = new PBDBoneInfo() {position = bonesArray[i].position, parentIndex = Array.IndexOf(bonesArray, bonesArray[i].parent)};
+                Debug.Log($"bones {i} position {_bonesData[i].position} parent {_bonesData[i].parentIndex}");
+            }
+
+
             _boneStiffness = boneStiffness;
             _pointCollisionStiffness = pointCollisionStiffness;
             _velocityDamping = velocityDamping;
@@ -106,12 +124,14 @@ namespace PBD
             _velocityBuffer = new ComputeBuffer(POINTS_AMOUNT, Marshal.SizeOf<Vector3>());
             _tempPositionBuffer = new ComputeBuffer(POINTS_AMOUNT, Marshal.SizeOf<Vector3>());
             _connectionDataBuffer = new ComputeBuffer(POINTS_AMOUNT * CONNECTION_AMOUNT, Marshal.SizeOf<PBDConnectionInfo>());
+            _bonesDataBuffer = new ComputeBuffer(_rootBone.childCount + 1, Marshal.SizeOf<PBDBoneInfo>());
 
             _shader.SetBuffer(_shaderKernel, "_pointsDataBuffer", _pointsDataBuffer);
             _shader.SetBuffer(_shaderKernel, "_positionBuffer", _positionBuffer);
             _shader.SetBuffer(_shaderKernel, "_velocityBuffer", _velocityBuffer);
             _shader.SetBuffer(_shaderKernel, "_tempPositionBuffer", _tempPositionBuffer);
             _shader.SetBuffer(_shaderKernel, "_connectionDataBuffer", _connectionDataBuffer);
+            _shader.SetBuffer(_shaderKernel, "_bonesDataBuffer", _bonesDataBuffer);
         }
 
         public void SetSettings()
@@ -122,6 +142,25 @@ namespace PBD
             _shader.SetInt("_solverSteps", SOLVER_STEPS);
             _shader.SetFloat("_collisionStiffness", _pointCollisionStiffness);
             _shader.SetFloat("_boneStiffness", _boneStiffness);
+            _shader.SetInt("_bonesAmount", _bones.length);
+        }
+
+        public void SetNewProperty(Type type, string name, object value) // не судите строго
+        {
+            if (type == typeof(float))
+            {
+                _shader.SetFloat(name, (float) value);
+            }
+
+            if (type == typeof(int))
+            {
+                _shader.SetInt(name, (int) value);
+            }
+
+            if (type == typeof(bool))
+            {
+                _shader.SetBool(name, (bool) value);
+            }
         }
 
 //        public Vector3 this[int index] => _points[index].p;
@@ -274,7 +313,22 @@ namespace PBD
         {
             _shader.SetFloat("_deltaTime", deltaTime);
             _shader.SetFloat("_prevDeltaTime", _prevDeltaTime);
-            _shader.SetVector("_bonePosition", _bone.position);
+
+            var prepareBonesJob = new PrepareBonesPositionCommands()
+            {
+                boneInfo = _bonesData
+            };
+            var prepareBonesDependency = prepareBonesJob.Schedule(_bones);
+            prepareBonesDependency.Complete();
+            
+//            for (var i = 0; i < _bonesData.Length; i++)
+//            {
+//                Debug.Log($"bones {i} position {_bonesData[i].position} parent {_bonesData[i].parentIndex}");
+//            }
+            
+            
+            _bonesDataBuffer.SetData(_bonesData);
+
             _shader.Dispatch(_shaderKernel, 1, 1, 1);
             _prevDeltaTime = deltaTime;
 
@@ -439,6 +493,7 @@ namespace PBD
         public void Dispose()
         {
             _transformAccessArray.Dispose();
+            _bones.Dispose();
             _pointsData.Dispose();
             _position.Dispose();
             _velocity.Dispose();
@@ -458,6 +513,7 @@ namespace PBD
             _velocityBuffer.Dispose();
             _tempPositionBuffer.Dispose();
             _connectionDataBuffer.Dispose();
+            _bonesData.Dispose();
         }
     }
 }

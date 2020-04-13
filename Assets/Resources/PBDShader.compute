@@ -16,6 +16,21 @@ struct PBDConnectionInfo
     float distance;
 };
 
+struct PBDBoneInfo
+{
+    float3 position;
+    int parentIndex;
+};
+
+float3 ClosestPointOnSegment(float3 p, float3 a, float3 b)
+{
+    float3 v = b - a;
+    float d = dot(p - a, v) / dot(v, v);
+    if (d <= 0) return a;
+    if (d >= 1) return b;
+    return a + d * v;
+}
+
 RWStructuredBuffer<PBDPointInfo> _pointsDataBuffer;
 RWStructuredBuffer<float3> _positionBuffer;
 RWStructuredBuffer<float3> _velocityBuffer;
@@ -23,11 +38,11 @@ RWStructuredBuffer<float3> _tempPositionBuffer;
 RWStructuredBuffer<PBDConnectionInfo> _connectionDataBuffer;
 RWStructuredBuffer<int> _neighboursUnitBuffer; // тут мы будем хранить вторую часть юнита каждой точки. L = POINT_AMOUNT
 RWStructuredBuffer<int> _neighboursBuffer; // тут мы будем хранить ближайшего соседа каждой точки (исключая ближайшую из юнита)
-
-
+RWStructuredBuffer<PBDBoneInfo> _bonesDataBuffer;
 
 
 int _connectionAmount;
+int _bonesAmount;
 int _solverSteps;
 
 float _deltaTime;
@@ -36,7 +51,6 @@ bool _useGravity;
 float _velocityDamping;
 float _collisionStiffness;
 float _boneStiffness;
-float4 _bonePosition;
  
 [numthreads(POINT_AMOUNT,1,1)]
 void PBD (uint3 id : SV_DispatchThreadID)
@@ -60,13 +74,10 @@ void PBD (uint3 id : SV_DispatchThreadID)
         
         GroupMemoryBarrierWithGroupSync();
         
-        float3 bone = _bonePosition.xyz;
+
+        
         for (int solverStep = 0; solverStep < _solverSteps; solverStep ++)
         {
-            // Bones calculations
-            float3 dir = _tempPositionBuffer[id.x] - bone;
-            float k = 1;
-            _tempPositionBuffer[id.x] -= k * _boneStiffness * dir;
             // Connections
             for (int i = 0; i < _connectionAmount; i++)
             {
@@ -100,8 +111,28 @@ void PBD (uint3 id : SV_DispatchThreadID)
                     }
                 }
             }
+            
+            // Bones calculations
+            float3 closestPoint = _bonesDataBuffer[0].position;
+            for (int k = 1; k < _bonesAmount; k ++)
+            {
+                float3 p = ClosestPointOnSegment(_tempPositionBuffer[id.x], _bonesDataBuffer[k].position, _bonesDataBuffer[_bonesDataBuffer[k].parentIndex].position);
+                if (length(p - _tempPositionBuffer[id.x]) < length(closestPoint - _tempPositionBuffer[id.x]))
+                {
+                    closestPoint = p;
+                }
+            }
+            
+            float3 dir = _tempPositionBuffer[id.x] - closestPoint;
+            _tempPositionBuffer[id.x] -= _boneStiffness * dir;
+            
+            
             GroupMemoryBarrierWithGroupSync();
         }
+        
+
     }
     GroupMemoryBarrierWithGroupSync();
 }
+
+

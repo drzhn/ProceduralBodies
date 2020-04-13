@@ -5,7 +5,7 @@ using UnityEngine.Jobs;
 
 namespace PBD
 {
-    public struct PBDPointInfo // layout?
+    public struct PBDPointInfo
     {
         public bool valid;
         public float mass;
@@ -18,6 +18,12 @@ namespace PBD
         public int pointIndex;
         public float stiffness;
         public float distance;
+    }
+
+    public struct PBDBoneInfo
+    {
+        public Vector3 position;
+        public int parentIndex;
     }
 
 //    public struct UpdateVelocityJob : IJobParallelFor
@@ -184,6 +190,18 @@ namespace PBD
         }
     }
 
+    public struct PrepareBonesPositionCommands : IJobParallelForTransform
+    {
+        public NativeArray<PBDBoneInfo> boneInfo;
+
+        public void Execute(int index, TransformAccess transform)
+        {
+            var info = boneInfo[index];
+            info.position = transform.position;
+            boneInfo[index] = info;
+        }
+    }
+
     public struct PrepareSpherecastCommands : IJobParallelFor
     {
         public NativeArray<SpherecastCommand> Spherecasts;
@@ -207,7 +225,7 @@ namespace PBD
     public struct IntegrateCollision : IJobParallelFor
     {
         [ReadOnly] public NativeArray<RaycastHit> Hits;
-        [ReadOnly]public NativeArray<PBDPointInfo> pointsData;
+        [ReadOnly] public NativeArray<PBDPointInfo> pointsData;
         public NativeArray<Vector3> oldPositions;
         public NativeArray<Vector3> newPositions;
 
@@ -216,14 +234,14 @@ namespace PBD
             if (!pointsData[i].valid) return;
 
             if (Hits[i].normal == Vector3.zero) return;
-            
+
             Vector3 oldPoint = oldPositions[i];
             Vector3 newPoint = newPositions[i];
-            Vector3 realCollisionPoint = Hits[i].point + Hits[i].normal * (pointsData[i].radius + 0.003f); 
+            Vector3 realCollisionPoint = Hits[i].point + Hits[i].normal * (pointsData[i].radius + 0.003f);
             oldPositions[i] = realCollisionPoint + (oldPoint - newPoint).normalized * (0.003f);
             newPositions[i] = realCollisionPoint +
-                      Vector3.ProjectOnPlane(newPoint - realCollisionPoint, Hits[i].normal) +
-                      Hits[i].normal * (0.003f);
+                              Vector3.ProjectOnPlane(newPoint - realCollisionPoint, Hits[i].normal) +
+                              Hits[i].normal * (0.003f);
         }
     }
 

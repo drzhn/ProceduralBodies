@@ -86,8 +86,8 @@ namespace PBD
                     }
                 }
             }
-            Debug.Log(amount*amount*amount);
-            Debug.Log(edgesAmount);
+//            Debug.Log(amount*amount*amount);
+//            Debug.Log(edgesAmount);
         }
     }
 }
