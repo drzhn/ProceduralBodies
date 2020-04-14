@@ -32,7 +32,7 @@ float3 ClosestPointOnSegment(float3 p, float3 a, float3 b)
 }
 
 RWStructuredBuffer<PBDPointInfo> _pointsDataBuffer;
-RWStructuredBuffer<float3> _positionBuffer;
+uniform RWStructuredBuffer<float3> _positionBuffer : register(u1);
 RWStructuredBuffer<float3> _velocityBuffer;
 RWStructuredBuffer<float3> _tempPositionBuffer;
 RWStructuredBuffer<PBDConnectionInfo> _connectionDataBuffer;
@@ -122,7 +122,6 @@ void PBD (uint3 id : SV_DispatchThreadID)
                     closestPoint = p;
                 }
             }
-            
             float3 dir = _tempPositionBuffer[id.x] - closestPoint;
             _tempPositionBuffer[id.x] -= _boneStiffness * dir;
             

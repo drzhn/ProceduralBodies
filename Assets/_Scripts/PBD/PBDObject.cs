@@ -14,8 +14,7 @@ namespace PBD
     public class PBDObject : IDisposable
     {
         // General settings
-        private const int
-            POINTS_AMOUNT = 1024; // we allocate all points data once and use special arrays for existence check
+        private const int POINTS_AMOUNT = 1024; // we allocate all points data once and use special arrays for existence check
 
 //        private const int BONES_AMOUNT = 10; // we allocate all points data once and use special arrays for existence check
         private const int CONNECTION_AMOUNT = 32; // how many connections may have each point
@@ -29,7 +28,7 @@ namespace PBD
 
 
         // Object data
-        private TransformAccessArray _transformAccessArray; // ref to actual transforms. count = POINTS_AMOUNT
+        //private TransformAccessArray _transformAccessArray; // ref to actual transforms. count = POINTS_AMOUNT
         private NativeArray<PBDPointInfo> _pointsData; // points data used for calculations. count = POINTS_AMOUNT
         private NativeArray<Vector3> _position; // current position of each point. count = POINTS_AMOUNT
         private NativeArray<Vector3> _velocity; // current velocity of each point. count = POINTS_AMOUNT
@@ -54,8 +53,8 @@ namespace PBD
 
         // connection to bones data
         private readonly Transform _rootBone;
-        private readonly TransformAccessArray _bones;
-        private readonly NativeArray<PBDBoneInfo> _bonesData;
+        private TransformAccessArray _bones;
+        private NativeArray<PBDBoneInfo> _bonesData;
 
         public PBDObject(
             float pointCollisionStiffness,
@@ -88,7 +87,7 @@ namespace PBD
             _velocityDamping = velocityDamping;
             _useGravity = useGravity;
 
-            _transformAccessArray = new TransformAccessArray(new Transform[POINTS_AMOUNT]);
+            //_transformAccessArray = new TransformAccessArray(new Transform[POINTS_AMOUNT]);
             _pointsData = new NativeArray<PBDPointInfo>(POINTS_AMOUNT, Allocator.Persistent);
             _position = new NativeArray<Vector3>(POINTS_AMOUNT, Allocator.Persistent);
             _velocity = new NativeArray<Vector3>(POINTS_AMOUNT, Allocator.Persistent);
@@ -107,7 +106,7 @@ namespace PBD
 
             for (int i = 0; i < POINTS_AMOUNT; i++)
             {
-                _transformAccessArray[i] = null;
+                //_transformAccessArray[i] = null;
                 for (int j = 0; j < CONNECTION_AMOUNT; j++)
                 {
                     var c = _connectionData[i * CONNECTION_AMOUNT + j];
@@ -132,6 +131,8 @@ namespace PBD
             _shader.SetBuffer(_shaderKernel, "_tempPositionBuffer", _tempPositionBuffer);
             _shader.SetBuffer(_shaderKernel, "_connectionDataBuffer", _connectionDataBuffer);
             _shader.SetBuffer(_shaderKernel, "_bonesDataBuffer", _bonesDataBuffer);
+
+            Shader.SetGlobalBuffer(Shader.PropertyToID("_positionBuffer"), _positionBuffer);
         }
 
         public void SetSettings()
@@ -235,12 +236,12 @@ namespace PBD
 //            _untiCount += 2;
 //        }
 
-        public void AddPoint(Transform t, float radius, float mass, out int index)
+        public void AddPoint(Vector3 position, float radius, float mass, out int index)
         {
             index = FindUnusedPointIndex();
             if (index == -1) throw new Exception($"Out of allocated memory for object ({POINTS_AMOUNT} elements), need to reallocate");
 
-            _transformAccessArray[index] = t;
+            //_transformAccessArray[index] = t;
             _pointsData[index] = new PBDPointInfo()
             {
                 mass = mass,
@@ -248,7 +249,7 @@ namespace PBD
                 collided = false,
                 valid = true
             };
-            _position[index] = t.position;
+            _position[index] = position;
             _tempPosition[index] = _position[index];
             _velocity[index] = Vector3.zero;
 
@@ -369,14 +370,14 @@ namespace PBD
             var integrateDependency = integrateJob.Schedule(_pointsData.Length, 32, _lastHandle);
             _lastHandle = integrateDependency;
 
-            var updatePositionJob = new UpdatePositionJob()
-            {
-                pointInfo = _pointsData,
-                tempPosition = _tempPosition
-            };
-
-            var positionDependency = updatePositionJob.Schedule(_transformAccessArray, _lastHandle);
-            _lastHandle = positionDependency;
+//            var updatePositionJob = new UpdatePositionJob()
+//            {
+//                pointInfo = _pointsData,
+//                tempPosition = _tempPosition
+//            };
+//
+//            var positionDependency = updatePositionJob.Schedule(_transformAccessArray, _lastHandle);
+//            _lastHandle = positionDependency;
 
             _lastHandle.Complete();
 
@@ -492,8 +493,7 @@ namespace PBD
 
         public void Dispose()
         {
-            _transformAccessArray.Dispose();
-            _bones.Dispose();
+            //_transformAccessArray.Dispose();
             _pointsData.Dispose();
             _position.Dispose();
             _velocity.Dispose();
@@ -513,7 +513,10 @@ namespace PBD
             _velocityBuffer.Dispose();
             _tempPositionBuffer.Dispose();
             _connectionDataBuffer.Dispose();
+            
+            _bones.Dispose();
             _bonesData.Dispose();
+            _bonesDataBuffer.Dispose();
         }
     }
 }
