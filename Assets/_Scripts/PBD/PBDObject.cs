@@ -160,6 +160,8 @@ namespace PBD
 
             if (type == typeof(bool))
             {
+                var v = (bool) value;
+                Debug.Log($"{name} set to {v}");
                 _shader.SetBool(name, (bool) value);
             }
         }

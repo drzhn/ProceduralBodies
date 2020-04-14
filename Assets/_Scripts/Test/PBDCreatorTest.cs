@@ -121,7 +121,7 @@ public class PBDCreatorTest : MonoBehaviour
         if (_useGravity != __useGravity)
         {
             __useGravity = _useGravity;
-            _pbd.SetNewProperty(typeof(bool), "_velocityDamping", _useGravity);
+            _pbd.SetNewProperty(typeof(bool), "_useGravity", _useGravity);
         }
     }
 
