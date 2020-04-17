@@ -1,0 +1,19 @@
+﻿#pragma kernel Skeleton
+#define UNITS_AMOUNT 512
+
+struct PBDSkeletonInfo
+{
+    bool valid;
+    int hipsIndex;
+    int neckIndex;
+};
+
+StructuredBuffer<float3> _positionBuffer : register(t1);
+RWStructuredBuffer<PBDSkeletonInfo> _skeletonDataBuffer; 
+RWStructuredBuffer<int> _neighboursUnitBuffer; // тут мы будем хранить вторую часть юнита каждой точки. L = POINT_AMOUNT
+RWStructuredBuffer<int> _neighboursBuffer; // тут мы будем хранить ближайшего соседа каждой точки (исключая ближайшую из юнита)
+
+[numthreads(UNITS_AMOUNT,1,1)]
+void Skeleton (uint3 id : SV_DispatchThreadID)
+{
+}
