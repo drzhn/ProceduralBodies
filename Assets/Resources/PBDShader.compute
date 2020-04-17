@@ -3,9 +3,8 @@
 
 struct PBDPointInfo
 {
-     bool valid;
+     int valid;
      float mass;
-     bool collided;
      float radius;
 };
 
@@ -22,7 +21,7 @@ struct PBDBoneInfo
     int parentIndex;
 };
 
-float3 ClosestPointOnSegment(float3 p, float3 a, float3 b)
+inline float3 ClosestPointOnSegment(float3 p, float3 a, float3 b)
 {
     float3 v = b - a;
     float d = dot(p - a, v) / dot(v, v);
@@ -32,12 +31,11 @@ float3 ClosestPointOnSegment(float3 p, float3 a, float3 b)
 }
 
 RWStructuredBuffer<PBDPointInfo> _pointsDataBuffer;
-uniform RWStructuredBuffer<float3> _positionBuffer : register(u1);
+RWStructuredBuffer<float3> _positionBuffer;
 RWStructuredBuffer<float3> _velocityBuffer;
 RWStructuredBuffer<float3> _tempPositionBuffer;
 RWStructuredBuffer<PBDConnectionInfo> _connectionDataBuffer;
-RWStructuredBuffer<int> _neighboursUnitBuffer; // тут мы будем хранить вторую часть юнита каждой точки. L = POINT_AMOUNT
-RWStructuredBuffer<int> _neighboursBuffer; // тут мы будем хранить ближайшего соседа каждой точки (исключая ближайшую из юнита)
+
 RWStructuredBuffer<PBDBoneInfo> _bonesDataBuffer;
 
 
@@ -55,7 +53,7 @@ float _boneStiffness;
 [numthreads(POINT_AMOUNT,1,1)]
 void PBD (uint3 id : SV_DispatchThreadID)
 {
-    if (_pointsDataBuffer[id.x].valid)
+    if (_pointsDataBuffer[id.x].valid == 1)
     {
         _velocityBuffer[id.x] = float3(0,0,0);
         if (_prevDeltaTime > 0) // обрабатываем инфу с предыдущего кадра
@@ -99,7 +97,7 @@ void PBD (uint3 id : SV_DispatchThreadID)
             // Collisions with other points
             for (uint j = 0; j < POINT_AMOUNT; j ++)
             {
-                if (_pointsDataBuffer[j].valid && j != id.x)
+                if (_pointsDataBuffer[j].valid == 1 && j != id.x)
                 {
                     float currentDistance = length(_tempPositionBuffer[j] - _tempPositionBuffer[id.x]);
                     float desiredDistance = _pointsDataBuffer[id.x].radius + _pointsDataBuffer[j].radius;
@@ -128,10 +126,8 @@ void PBD (uint3 id : SV_DispatchThreadID)
             
             GroupMemoryBarrierWithGroupSync();
         }
-        
-
     }
-    GroupMemoryBarrierWithGroupSync();
+    //GroupMemoryBarrierWithGroupSync();
 }
 
 

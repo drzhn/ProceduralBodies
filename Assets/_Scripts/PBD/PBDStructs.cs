@@ -7,9 +7,8 @@ namespace PBD
 {
     public struct PBDPointInfo
     {
-        public bool valid;
+        public int valid;
         public float mass;
-        public bool collided;
         public float radius;
     }
 
@@ -25,6 +24,70 @@ namespace PBD
         public Vector3 position;
         public int parentIndex;
     }
+
+    public struct PBDSkeletonInfo
+    {
+        public bool valid;
+        public int hipsIndex;
+        public int neckIndex;
+    }
+
+
+    public struct PrepareBonesPositionCommands : IJobParallelForTransform
+    {
+        public NativeArray<PBDBoneInfo> boneInfo;
+
+        public void Execute(int index, TransformAccess transform)
+        {
+            var info = boneInfo[index];
+            info.position = transform.position;
+            boneInfo[index] = info;
+        }
+    }
+
+    public struct PrepareSpherecastCommands : IJobParallelFor
+    {
+        public NativeArray<SpherecastCommand> Spherecasts;
+        [ReadOnly] public NativeArray<PBDPointInfo> pointsData;
+        [ReadOnly] public NativeArray<Vector3> oldPositions;
+        [ReadOnly] public NativeArray<Vector3> newPositions;
+
+
+        public void Execute(int i)
+        {
+            if (pointsData[i].valid == 0) return;
+
+            Spherecasts[i] = new SpherecastCommand(
+                oldPositions[i],
+                pointsData[i].radius,
+                (newPositions[i] - oldPositions[i]).normalized,
+                Vector3.Distance(newPositions[i], oldPositions[i]) + 0.003f);
+        }
+    }
+
+    public struct IntegrateCollision : IJobParallelFor
+    {
+        [ReadOnly] public NativeArray<RaycastHit> Hits;
+        [ReadOnly] public NativeArray<PBDPointInfo> pointsData;
+        public NativeArray<Vector3> oldPositions;
+        public NativeArray<Vector3> newPositions;
+
+        public void Execute(int i)
+        {
+            if (pointsData[i].valid == 0) return;
+
+            if (Hits[i].normal == Vector3.zero) return;
+
+            Vector3 oldPoint = oldPositions[i];
+            Vector3 newPoint = newPositions[i];
+            Vector3 realCollisionPoint = Hits[i].point + Hits[i].normal * (pointsData[i].radius + 0.003f);
+            oldPositions[i] = realCollisionPoint + (oldPoint - newPoint).normalized * (0.003f);
+            newPositions[i] = realCollisionPoint +
+                              Vector3.ProjectOnPlane(newPoint - realCollisionPoint, Hits[i].normal) +
+                              Hits[i].normal * (0.003f);
+        }
+    }
+}
 
 //    public struct UpdateVelocityJob : IJobParallelFor
 //    {
@@ -176,84 +239,28 @@ namespace PBD
 //            return Vector3.zero;
 //        }
 //    }
-
-    public struct UpdateTemporaryArrayJob : IJobParallelFor
-    {
-        [ReadOnly] public NativeArray<PBDPointInfo> points;
-        public NativeArray<Vector3> tempPoints;
-
-        public void Execute(int i)
-        {
-            if (!points[i].valid) return;
-
-//            tempPoints[i] = points[i].p;
-        }
-    }
-
-    public struct PrepareBonesPositionCommands : IJobParallelForTransform
-    {
-        public NativeArray<PBDBoneInfo> boneInfo;
-
-        public void Execute(int index, TransformAccess transform)
-        {
-            var info = boneInfo[index];
-            info.position = transform.position;
-            boneInfo[index] = info;
-        }
-    }
-
-    public struct PrepareSpherecastCommands : IJobParallelFor
-    {
-        public NativeArray<SpherecastCommand> Spherecasts;
-        [ReadOnly] public NativeArray<PBDPointInfo> pointsData;
-        [ReadOnly] public NativeArray<Vector3> oldPositions;
-        [ReadOnly] public NativeArray<Vector3> newPositions;
-
-
-        public void Execute(int i)
-        {
-            if (!pointsData[i].valid) return;
-
-            Spherecasts[i] = new SpherecastCommand(
-                oldPositions[i],
-                pointsData[i].radius,
-                (newPositions[i] - oldPositions[i]).normalized,
-                Vector3.Distance(newPositions[i], oldPositions[i]) + 0.003f);
-        }
-    }
-
-    public struct IntegrateCollision : IJobParallelFor
-    {
-        [ReadOnly] public NativeArray<RaycastHit> Hits;
-        [ReadOnly] public NativeArray<PBDPointInfo> pointsData;
-        public NativeArray<Vector3> oldPositions;
-        public NativeArray<Vector3> newPositions;
-
-        public void Execute(int i)
-        {
-            if (!pointsData[i].valid) return;
-
-            if (Hits[i].normal == Vector3.zero) return;
-
-            Vector3 oldPoint = oldPositions[i];
-            Vector3 newPoint = newPositions[i];
-            Vector3 realCollisionPoint = Hits[i].point + Hits[i].normal * (pointsData[i].radius + 0.003f);
-            oldPositions[i] = realCollisionPoint + (oldPoint - newPoint).normalized * (0.003f);
-            newPositions[i] = realCollisionPoint +
-                              Vector3.ProjectOnPlane(newPoint - realCollisionPoint, Hits[i].normal) +
-                              Hits[i].normal * (0.003f);
-        }
-    }
-
-    public struct UpdatePositionJob : IJobParallelForTransform
-    {
-        [ReadOnly] public NativeArray<PBDPointInfo> pointInfo;
-        [ReadOnly] public NativeArray<Vector3> tempPosition;
-
-        public void Execute(int index, TransformAccess transform)
-        {
-            if (!pointInfo[index].valid) return;
-            transform.position = tempPosition[index];
-        }
-    }
-}
+//
+//     public struct UpdateTemporaryArrayJob : IJobParallelFor
+//     {
+//         [ReadOnly] public NativeArray<PBDPointInfo> points;
+//         public NativeArray<Vector3> tempPoints;
+//
+//         public void Execute(int i)
+//         {
+//             if (!points[i].valid) return;
+//
+// //            tempPoints[i] = points[i].p;
+//         }
+// //     }
+//
+//     public struct UpdatePositionJob : IJobParallelForTransform
+//     {
+//         [ReadOnly] public NativeArray<PBDPointInfo> pointInfo;
+//         [ReadOnly] public NativeArray<Vector3> tempPosition;
+//
+//         public void Execute(int index, TransformAccess transform)
+//         {
+//             if (!pointInfo[index].valid) return;
+//             transform.position = tempPosition[index];
+//         }
+//     }

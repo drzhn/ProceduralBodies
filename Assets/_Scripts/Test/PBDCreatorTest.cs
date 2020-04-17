@@ -7,7 +7,6 @@ using UnityEngine;
 public class PBDCreatorTest : MonoBehaviour
 {
     [SerializeField] private Transform _rootBone;
-    [SerializeField] private Mesh _instancedMesh;
     [SerializeField] private Material _instancedMaterial;
     [SerializeField] private int _amountPerDimension;
     [SerializeField] [Range(0, 1)] private float _radius;
@@ -16,6 +15,7 @@ public class PBDCreatorTest : MonoBehaviour
     [SerializeField] [Range(0, 1)] private float _boneStiffness;
     [SerializeField] [Range(0, 1)] private float _damping;
     [SerializeField] private bool _useGravity;
+    [SerializeField] [Space] private bool _debugPoints;
 
 
     private PBDConnectionTest[] _connections;
@@ -30,6 +30,7 @@ public class PBDCreatorTest : MonoBehaviour
 
 
     private ComputeBuffer _argsBuffer;
+    private Mesh _debugMesh;
 
 
     void Start()
@@ -51,16 +52,16 @@ public class PBDCreatorTest : MonoBehaviour
 
         _pbd = new PBDObject(_collisionStiffness, _boneStiffness, _damping, _useGravity, _rootBone);
 
-        for (int x = 0; x < _amountPerDimension; x++)
-        {
-            for (int y = 0; y < _amountPerDimension; y++)
-            {
-                for (int z = 0; z < _amountPerDimension; z++)
-                {
-                    _pbd.AddPoint(new Vector3(x, y, z), _radius, 1, out var index);
-                }
-            }
-        }
+        // for (int x = 0; x < _amountPerDimension; x++)
+        // {
+        //     for (int y = 0; y < _amountPerDimension; y++)
+        //     {
+        //         for (int z = 0; z < _amountPerDimension; z++)
+        //         {
+        //             _pbd.AddPoint(new Vector3(x, y, z), _radius, 1, out var index);
+        //         }
+        //     }
+        // }
 
         _pbd.SetSettings();
 
@@ -68,31 +69,84 @@ public class PBDCreatorTest : MonoBehaviour
         __boneStiffness = _boneStiffness;
         __damping = _damping;
         __useGravity = _useGravity;
-
-        int[] args = new int[5] {0, 0, 0, 0, 0};
-        _argsBuffer = new ComputeBuffer(1, args.Length * sizeof(uint), ComputeBufferType.IndirectArguments);
-        args[0] = (int) _instancedMesh.GetIndexCount(0);
-        args[1] = _amountPerDimension * _amountPerDimension * _amountPerDimension;
-        args[2] = (int) _instancedMesh.GetIndexStart(0);
-        args[3] = (int) _instancedMesh.GetBaseVertex(0);
-
-        _argsBuffer.SetData(args);
     }
+
+    private readonly Bounds _drawingBounds = new Bounds(Vector3.zero, new Vector3(100.0f, 100.0f, 100.0f));
 
     private void Update()
     {
-        Graphics.DrawMeshInstancedIndirect(
-            _instancedMesh, 
-            0, 
-            _instancedMaterial, 
-            new Bounds(Vector3.zero, new Vector3(100.0f, 100.0f, 100.0f)),
-            _argsBuffer);
+        if (_debugPoints)
+        {
+            if (_argsBuffer == null)
+            {
+                PrepareDebugMesh();
+            }
+
+            Graphics.DrawMeshInstancedIndirect(
+                _debugMesh,
+                0,
+                _instancedMaterial,
+                _drawingBounds,
+                _argsBuffer);
+        }
     }
 
+    private void OnGUI()
+    {
+        if (GUI.Button(new Rect(0, 30, 100, 30), "Add new unit"))
+        {
+            AddUnit();
+        }
+    }
+
+    private void AddUnit()
+    {
+        _pbd.AddUnit(
+            new Vector3(0, 0, 0),
+            _radius,
+            new Vector3(0, 1, 0),
+            _radius,
+            _stiffness
+        );
+    }
 
     void FixedUpdate()
     {
         _pbd.OnUpdate(Time.fixedDeltaTime);
+    }
+
+    private void PrepareDebugMesh()
+    {
+        _debugMesh = new Mesh();
+        List<Vector3> positions = new List<Vector3>();
+
+        positions.Add(new Vector3(-0.5f, 0, 0));
+        positions.Add(new Vector3(+0.5f, 0, 0));
+
+        positions.Add(new Vector3(0, -0.5f, 0));
+        positions.Add(new Vector3(0, +0.5f, 0));
+
+        positions.Add(new Vector3(0, 0, -0.5f));
+        positions.Add(new Vector3(0, 0, +0.5f));
+
+        List<int> indices = new List<int>();
+        for (int i = 0; i < positions.Count; i += 2)
+        {
+            indices.Add(i);
+            indices.Add(i + 1);
+        }
+
+        _debugMesh.SetVertices(positions);
+        _debugMesh.SetIndices(indices, MeshTopology.Lines, 0);
+
+        int[] args = new int[5] {0, 0, 0, 0, 0};
+        _argsBuffer = new ComputeBuffer(1, args.Length * sizeof(uint), ComputeBufferType.IndirectArguments);
+        args[0] = (int) _debugMesh.GetIndexCount(0);
+        args[1] = 1024;
+        args[2] = (int) _debugMesh.GetIndexStart(0);
+        args[3] = (int) _debugMesh.GetBaseVertex(0);
+
+        _argsBuffer.SetData(args);
     }
 
 #if UNITY_EDITOR
@@ -131,6 +185,6 @@ public class PBDCreatorTest : MonoBehaviour
     private void OnDestroy()
     {
         _pbd.Dispose();
-        _argsBuffer.Dispose();
+        _argsBuffer?.Dispose();
     }
 }

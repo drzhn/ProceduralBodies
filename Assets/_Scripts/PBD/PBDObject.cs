@@ -1,22 +1,19 @@
 using System;
-using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using Unity.Collections;
-using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using UnityEngine;
 using UnityEngine.Jobs;
-using UnityEngine.Rendering;
-using Random = UnityEngine.Random;
 
 namespace PBD
 {
     public class PBDObject : IDisposable
     {
+        public Vector3 this[int index] => _position[index];
+
         // General settings
         private const int POINTS_AMOUNT = 1024; // we allocate all points data once and use special arrays for existence check
 
-//        private const int BONES_AMOUNT = 10; // we allocate all points data once and use special arrays for existence check
         private const int CONNECTION_AMOUNT = 32; // how many connections may have each point
         private const int SOLVER_STEPS = 3;
 
@@ -38,14 +35,17 @@ namespace PBD
         private NativeArray<PBDConnectionInfo> _connectionData; // data containing connection information between points. count = POINTS_AMOUNT * STRETCHING_CAPACITY (2d array repr.)
 
         // compute shader data
-        private readonly ComputeShader _shader;
-        private readonly int _shaderKernel;
+        private readonly ComputeShader _pbdShader;
+        private readonly ComputeShader _skeletonShader;
+        private readonly int _pbdKernel;
+        private readonly int _skeletonKernel;
         private readonly ComputeBuffer _pointsDataBuffer;
         private readonly ComputeBuffer _positionBuffer;
         private readonly ComputeBuffer _velocityBuffer;
         private readonly ComputeBuffer _tempPositionBuffer;
         private readonly ComputeBuffer _connectionDataBuffer;
         private readonly ComputeBuffer _bonesDataBuffer;
+        private readonly ComputeBuffer _skeletonDataBuffer;
 
         // spherecast batching data
         private NativeArray<SpherecastCommand> _sphereCastCommands; // for batching spherecast
@@ -87,26 +87,25 @@ namespace PBD
             _velocityDamping = velocityDamping;
             _useGravity = useGravity;
 
-            //_transformAccessArray = new TransformAccessArray(new Transform[POINTS_AMOUNT]);
             _pointsData = new NativeArray<PBDPointInfo>(POINTS_AMOUNT, Allocator.Persistent);
             _position = new NativeArray<Vector3>(POINTS_AMOUNT, Allocator.Persistent);
             _velocity = new NativeArray<Vector3>(POINTS_AMOUNT, Allocator.Persistent);
             _tempPosition = new NativeArray<Vector3>(POINTS_AMOUNT, Allocator.Persistent);
 
-            _connectionData =
-                new NativeArray<PBDConnectionInfo>(POINTS_AMOUNT * CONNECTION_AMOUNT,
-                    Allocator.Persistent); // TODO make -1
+            _connectionData = new NativeArray<PBDConnectionInfo>(POINTS_AMOUNT * CONNECTION_AMOUNT, Allocator.Persistent); // TODO make -1
 
             _sphereCastCommands = new NativeArray<SpherecastCommand>(POINTS_AMOUNT, Allocator.Persistent);
             _sphereCastHits = new NativeArray<RaycastHit>(POINTS_AMOUNT, Allocator.Persistent);
 
-            // _bones = new TransformAccessArray(BONES_AMOUNT);
-            // _bonesDistances = new NativeArray<float>(POINTS_AMOUNT * BONES_AMOUNT, Allocator.Persistent);
-            // _bonesExistence = new NativeArray<bool>(BONES_AMOUNT, Allocator.Persistent);
 
             for (int i = 0; i < POINTS_AMOUNT; i++)
             {
-                //_transformAccessArray[i] = null;
+                _pointsData[i] = new PBDPointInfo()
+                {
+                    valid = 0,
+                    mass = 0,
+                    radius = 0
+                };
                 for (int j = 0; j < CONNECTION_AMOUNT; j++)
                 {
                     var c = _connectionData[i * CONNECTION_AMOUNT + j];
@@ -115,141 +114,92 @@ namespace PBD
                 }
             }
 
-            _shader = (ComputeShader) Resources.Load("PBDShader");
-            if (_shader == null) throw new Exception($"Shader is not in Resource Folder");
-            _shaderKernel = _shader.FindKernel("PBD");
+            _pbdShader = (ComputeShader) Resources.Load("PBDShader");
+            if (_pbdShader == null) throw new Exception($"Shader is not in Resource Folder");
+            _pbdKernel = _pbdShader.FindKernel("PBD");
+
+            _skeletonShader = (ComputeShader) Resources.Load("PBDSkeletonShader");
+            if (_skeletonShader == null) throw new Exception($"Skeleton shader is not in Resource Folder");
+            _skeletonKernel = _skeletonShader.FindKernel("Skeleton");
+
             _pointsDataBuffer = new ComputeBuffer(POINTS_AMOUNT, Marshal.SizeOf<PBDPointInfo>());
             _positionBuffer = new ComputeBuffer(POINTS_AMOUNT, Marshal.SizeOf<Vector3>());
             _velocityBuffer = new ComputeBuffer(POINTS_AMOUNT, Marshal.SizeOf<Vector3>());
             _tempPositionBuffer = new ComputeBuffer(POINTS_AMOUNT, Marshal.SizeOf<Vector3>());
             _connectionDataBuffer = new ComputeBuffer(POINTS_AMOUNT * CONNECTION_AMOUNT, Marshal.SizeOf<PBDConnectionInfo>());
             _bonesDataBuffer = new ComputeBuffer(_rootBone.childCount + 1, Marshal.SizeOf<PBDBoneInfo>());
+            _skeletonDataBuffer = new ComputeBuffer(POINTS_AMOUNT / 2, Marshal.SizeOf<PBDSkeletonInfo>());
 
-            _shader.SetBuffer(_shaderKernel, "_pointsDataBuffer", _pointsDataBuffer);
-            _shader.SetBuffer(_shaderKernel, "_positionBuffer", _positionBuffer);
-            _shader.SetBuffer(_shaderKernel, "_velocityBuffer", _velocityBuffer);
-            _shader.SetBuffer(_shaderKernel, "_tempPositionBuffer", _tempPositionBuffer);
-            _shader.SetBuffer(_shaderKernel, "_connectionDataBuffer", _connectionDataBuffer);
-            _shader.SetBuffer(_shaderKernel, "_bonesDataBuffer", _bonesDataBuffer);
+            _pbdShader.SetBuffer(_pbdKernel, "_pointsDataBuffer", _pointsDataBuffer);
+            _pbdShader.SetBuffer(_pbdKernel, "_positionBuffer", _positionBuffer);
+            _pbdShader.SetBuffer(_pbdKernel, "_velocityBuffer", _velocityBuffer);
+            _pbdShader.SetBuffer(_pbdKernel, "_tempPositionBuffer", _tempPositionBuffer);
+            _pbdShader.SetBuffer(_pbdKernel, "_connectionDataBuffer", _connectionDataBuffer);
+            _pbdShader.SetBuffer(_pbdKernel, "_bonesDataBuffer", _bonesDataBuffer);
 
-            Shader.SetGlobalBuffer(Shader.PropertyToID("_positionBuffer"), _positionBuffer);
+            _skeletonShader.SetBuffer(_skeletonKernel, "_positionBuffer", _positionBuffer);
+            _skeletonShader.SetBuffer(_skeletonKernel, "_skeletonDataBuffer", _skeletonDataBuffer);
+
+            Shader.SetGlobalBuffer(Shader.PropertyToID("_positionBuffer"), _positionBuffer); // for debug
         }
 
         public void SetSettings()
         {
-            _shader.SetFloat("_velocityDamping", _velocityDamping);
-            _shader.SetBool("_useGravity", _useGravity);
-            _shader.SetInt("_connectionAmount", CONNECTION_AMOUNT);
-            _shader.SetInt("_solverSteps", SOLVER_STEPS);
-            _shader.SetFloat("_collisionStiffness", _pointCollisionStiffness);
-            _shader.SetFloat("_boneStiffness", _boneStiffness);
-            _shader.SetInt("_bonesAmount", _bones.length);
+            _pbdShader.SetFloat("_velocityDamping", _velocityDamping);
+            _pbdShader.SetBool("_useGravity", _useGravity);
+            _pbdShader.SetInt("_connectionAmount", CONNECTION_AMOUNT);
+            _pbdShader.SetInt("_solverSteps", SOLVER_STEPS);
+            _pbdShader.SetFloat("_collisionStiffness", _pointCollisionStiffness);
+            _pbdShader.SetFloat("_boneStiffness", _boneStiffness);
+            _pbdShader.SetInt("_bonesAmount", _bones.length);
+
+            _pointsDataBuffer.SetData(_pointsData);
         }
 
         public void SetNewProperty(Type type, string name, object value) // не судите строго
         {
             if (type == typeof(float))
             {
-                _shader.SetFloat(name, (float) value);
+                _pbdShader.SetFloat(name, (float) value);
             }
 
             if (type == typeof(int))
             {
-                _shader.SetInt(name, (int) value);
+                _pbdShader.SetInt(name, (int) value);
             }
 
             if (type == typeof(bool))
             {
                 var v = (bool) value;
                 Debug.Log($"{name} set to {v}");
-                _shader.SetBool(name, (bool) value);
+                _pbdShader.SetBool(name, (bool) value);
             }
         }
 
-//        public Vector3 this[int index] => _points[index].p;
 
-//        public void AddUnit(Transform hips, Transform neck, out int hipsIndex, out int neckIndex)
-//        {
-//            int index = FindUnusedPointIndex();
-//            if (index == -1) throw new Exception("Out of allocated memory for object, need to reallocate");
-//            hipsIndex = index;
-//            neckIndex = index + 1;
-//            Debug.Log($"new points {hipsIndex},{neckIndex}");
-//
-//            Vector3 middlePoint = (hips.position + neck.position) / 2f;
-//
-//            int[] nearestPoints = FindIndicesOfNNearestPoints(Mathf.Min(3, _untiCount), middlePoint);
-//
-//            foreach (int i in nearestPoints)
-//            {
-//                Debug.Log(i);
-//            }
-//
-//            if (_untiCount / 2 == 1)
-//            {
-//                Vector3 a = _points[nearestPoints[0]].p;
-//                Vector3 b = _points[nearestPoints[1]].p;
-//                Vector3 c = middlePoint;
-//
-//                Vector3 project = Vector3.Project((c - a), (b - a));
-//                Vector3 perpendicular = (c - a) - project;
-//                Vector3 centerOfBody = (a + b) / 2f + _pointRadius * 2 * perpendicular.normalized;
-//                Vector3 hipsPosition = centerOfBody + Quaternion.AngleAxis(Random.Range(-180f, 180), perpendicular) * ((b - a).normalized * (hips.position - neck.position).magnitude / 2f);
-//
-//                hips.position = hipsPosition;
-//                hips.rotation = PBDUtils.LookAtXAxis((centerOfBody - hipsPosition), Vector3.up);
-//            }
-//
-//            if (_untiCount / 2 >= 2)
-//            {
-//                Vector3 a = _points[nearestPoints[0]].p;
-//                Vector3 b = _points[nearestPoints[1]].p;
-//                Vector3 c = _points[nearestPoints[2]].p;
-//                Vector3 d = middlePoint;
-//                // TODO ОТТЕСТИРОВАТЬ !!! нихуя не понял но очень интересно
-//                Vector3 perpendicular = Vector3.Cross((c - a), (b - a));
-//                Vector3 project = Vector3.ProjectOnPlane((d - a), perpendicular.normalized);
-//                Vector3 centerOfBody = (a + b + c) / 3f + _pointRadius * 2 * perpendicular.normalized;
-//                Vector3 hipsPosition = centerOfBody + Quaternion.AngleAxis(Random.Range(-180f, 180), perpendicular) * ((b - a).normalized * (hips.position - neck.position).magnitude / 2f);
-//
-//                Debug.DrawLine(a, b, Color.red, 10);
-//                Debug.DrawLine(a, c, Color.red, 10);
-//                Debug.DrawLine(b, c, Color.red, 10);
-//                Debug.DrawLine(centerOfBody, hipsPosition, Color.green, 10);
-//
-//                hips.position = hipsPosition;
-//                hips.rotation = PBDUtils.LookAtXAxis((centerOfBody - hipsPosition), Vector3.up);
-//            }
-//
-//            AddPoint(hips, hipsIndex);
-//            AddPoint(neck, neckIndex);
-//            Debug.Log($"add connection {hipsIndex} to {neckIndex}");
-//
-//            AddConnection(hipsIndex, neckIndex, _bodyStretchingStiffness);
-//            foreach (int i in nearestPoints)
-//            {
-//                Debug.Log($"add connection {i} to {hipsIndex},{neckIndex}");
-//
-//                AddConnection(i, hipsIndex, _stretchingStiffness, 0.5f);
-//                AddConnection(i, neckIndex, _stretchingStiffness, 0.5f);
-//            }
-//
-//
-//            _untiCount += 2;
-//        }
+        public void AddUnit(
+            Vector3 hipsPosition,
+            float hipsRadius,
+            Vector3 neckPosition,
+            float neckRadius,
+            float stiffness
+        )
+        {
+            AddPoint(hipsPosition, hipsRadius, 1, out var index1);
+            AddPoint(neckPosition, neckRadius, 1, out var index2);
+            AddConnection(index1, index2, stiffness);
+        }
 
         public void AddPoint(Vector3 position, float radius, float mass, out int index)
         {
             index = FindUnusedPointIndex();
             if (index == -1) throw new Exception($"Out of allocated memory for object ({POINTS_AMOUNT} elements), need to reallocate");
 
-            //_transformAccessArray[index] = t;
             _pointsData[index] = new PBDPointInfo()
             {
+                valid = 1,
                 mass = mass,
                 radius = radius,
-                collided = false,
-                valid = true
             };
             _position[index] = position;
             _tempPosition[index] = _position[index];
@@ -314,8 +264,8 @@ namespace PBD
 
         public void OnUpdate(float deltaTime)
         {
-            _shader.SetFloat("_deltaTime", deltaTime);
-            _shader.SetFloat("_prevDeltaTime", _prevDeltaTime);
+            _pbdShader.SetFloat("_deltaTime", deltaTime);
+            _pbdShader.SetFloat("_prevDeltaTime", _prevDeltaTime);
 
             var prepareBonesJob = new PrepareBonesPositionCommands()
             {
@@ -323,16 +273,10 @@ namespace PBD
             };
             var prepareBonesDependency = prepareBonesJob.Schedule(_bones);
             prepareBonesDependency.Complete();
-            
-//            for (var i = 0; i < _bonesData.Length; i++)
-//            {
-//                Debug.Log($"bones {i} position {_bonesData[i].position} parent {_bonesData[i].parentIndex}");
-//            }
-            
-            
             _bonesDataBuffer.SetData(_bonesData);
 
-            _shader.Dispatch(_shaderKernel, 1, 1, 1);
+            _pbdShader.Dispatch(_pbdKernel, 1, 1, 1);
+
             _prevDeltaTime = deltaTime;
 
 
@@ -371,16 +315,6 @@ namespace PBD
 
             var integrateDependency = integrateJob.Schedule(_pointsData.Length, 32, _lastHandle);
             _lastHandle = integrateDependency;
-
-//            var updatePositionJob = new UpdatePositionJob()
-//            {
-//                pointInfo = _pointsData,
-//                tempPosition = _tempPosition
-//            };
-//
-//            var positionDependency = updatePositionJob.Schedule(_transformAccessArray, _lastHandle);
-//            _lastHandle = positionDependency;
-
             _lastHandle.Complete();
 
             _positionBuffer.SetData(_position);
@@ -388,54 +322,13 @@ namespace PBD
 
             sphereCastCommands.Dispose();
             sphereCastHits.Dispose();
-
-//            var updateVelocityJob = new UpdateVelocityJob()
-//            {
-//                DeltaTime = Time.deltaTime,
-//                points = _points,
-//                UseGravity = _useGravity,
-//                VelocityDamping = _damping
-//            };
-//            var velocityDependency = updateVelocityJob.Schedule(_points.Length, 32);
-//            _lastHandle = velocityDependency;
-
-//            NativeArray<JobHandle> stretchingDependencies = new NativeArray<JobHandle>(SOLVER_STEPS, Allocator.Temp);
-//            NativeArray<JobHandle> updateTemporaryArrayDependencies =
-//                new NativeArray<JobHandle>(SOLVER_STEPS, Allocator.Temp);
-//            for (int i = 0; i < SOLVER_STEPS; i++)
-//            {
-//                var updateStretchingJob = new UpdateStretchingJob()
-//                {
-//                    pointRadius = _pointRadius,
-//                    connectionAmount = CONNECTION_AMOUNT,
-//                    collisionStretchingStiffness = _pointCollisionStiffness,
-//                    points = _points,
-//                    connectionStiffness = _connectionStiffness,
-//                    connectionDistances = _connectionDistances,
-//                    tempPoints = _tempPoints,
-//                    connectedPoints = _connectedPoints,
-//                };
-//                stretchingDependencies[i] =
-//                    updateStretchingJob.Schedule(_points.Length, 32, _lastHandle);
-//                _lastHandle = stretchingDependencies[i];
-//                
-//                var updateTemporaryArrayJob = new UpdateTemporaryArrayJob()
-//                {
-//                    points = _points,
-//                    tempPoints = _tempPoints
-//                };
-//                updateTemporaryArrayDependencies[i] =
-//                    updateTemporaryArrayJob.Schedule(_points.Length, 32, _lastHandle);
-//                _lastHandle = updateTemporaryArrayDependencies[i];
-//            }
-//            
         }
 
         private int FindUnusedPointIndex()
         {
             for (int i = 0; i < _pointsData.Length; i++)
             {
-                if (!_pointsData[i].valid) return i;
+                if (_pointsData[i].valid == 0) return i;
             }
 
             return -1;
@@ -456,42 +349,6 @@ namespace PBD
 
             return -1;
         }
-
-//        private int[] FindIndicesOfNNearestPoints(int n, Vector3 position)
-//        {
-//            var result = new int[n];
-//            for (int i = 0; i < n; i++)
-//            {
-//                result[i] = i;
-//            }
-//
-//            for (int i = n; i < _pointsData.Length; i++)
-//            {
-//                if (!_pointsData[i].valid) continue;
-//                float d = Vector3.Distance(_points[i].p, position);
-//
-//                float maxDistance = float.MinValue;
-//                int maxIndex = -1;
-//                for (int j = 0; j < n; j++)
-//                {
-//                    float dist = Vector3.Distance(_points[result[j]].p, position);
-//                    if (dist > maxDistance)
-//                    {
-//                        maxDistance = dist;
-//                        maxIndex = j;
-//                    }
-//                }
-//
-//                if (d < maxDistance)
-//                {
-//                    result[maxIndex] = i;
-//                }
-//            }
-//
-//
-//            return result;
-//        }
-
 
         public void Dispose()
         {
@@ -515,10 +372,12 @@ namespace PBD
             _velocityBuffer.Dispose();
             _tempPositionBuffer.Dispose();
             _connectionDataBuffer.Dispose();
-            
+
             _bones.Dispose();
             _bonesData.Dispose();
             _bonesDataBuffer.Dispose();
+
+            _skeletonDataBuffer.Dispose();
         }
     }
 }

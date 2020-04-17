@@ -9,7 +9,6 @@
         LOD 200
 
         CGPROGRAM
-        // Physically based Standard lighting model
         #pragma target 5.0
         #pragma only_renderers d3d11
         #pragma surface surf Standard addshadow fullforwardshadows
