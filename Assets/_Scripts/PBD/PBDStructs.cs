@@ -1,3 +1,4 @@
+using System;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
@@ -31,6 +32,13 @@ namespace PBD
         public bool valid;
         public int hipsIndex;
         public int neckIndex;
+    }
+    
+    [Serializable]
+    public struct PBDSkeletonBoneTransform
+    {
+        public Matrix4x4 Trs;
+        public int ParentIndex;
     }
 
 

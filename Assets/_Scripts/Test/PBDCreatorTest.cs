@@ -63,8 +63,6 @@ public class PBDCreatorTest : MonoBehaviour
         //     }
         // }
 
-        _pbd.SetSettings();
-
         __collisionStiffness = _collisionStiffness;
         __boneStiffness = _boneStiffness;
         __damping = _damping;

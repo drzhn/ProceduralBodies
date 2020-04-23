@@ -26,7 +26,6 @@ namespace PBD
 
 
         // Object data
-        //private TransformAccessArray _transformAccessArray; // ref to actual transforms. count = POINTS_AMOUNT
         private NativeArray<PBDPointInfo> _pointsData; // points data used for calculations. count = POINTS_AMOUNT
         private NativeArray<Vector3> _position; // current position of each point. count = POINTS_AMOUNT
         private NativeArray<Vector3> _velocity; // current velocity of each point. count = POINTS_AMOUNT
@@ -34,6 +33,9 @@ namespace PBD
 
         // stretching data
         private NativeArray<PBDConnectionInfo> _connectionData; // data containing connection information between points. count = POINTS_AMOUNT * STRETCHING_CAPACITY (2d array repr.)
+
+        // skeleton data
+        private NativeArray<PBDSkeletonInfo> _skeletonInfo;
 
         // compute shader data
         private readonly ComputeShader _pbdShader;
@@ -98,6 +100,8 @@ namespace PBD
             _sphereCastCommands = new NativeArray<SpherecastCommand>(POINTS_AMOUNT, Allocator.Persistent);
             _sphereCastHits = new NativeArray<RaycastHit>(POINTS_AMOUNT, Allocator.Persistent);
 
+            _skeletonInfo = new NativeArray<PBDSkeletonInfo>(POINTS_AMOUNT / 2, Allocator.Persistent);
+
 
             for (int i = 0; i < POINTS_AMOUNT; i++)
             {
@@ -112,6 +116,16 @@ namespace PBD
                     var c = _connectionData[i * CONNECTION_AMOUNT + j];
                     c.pointIndex = -1;
                     _connectionData[i * CONNECTION_AMOUNT + j] = c;
+                }
+
+                if (i % 2 == 0)
+                {
+                    _skeletonInfo[i/2] = new PBDSkeletonInfo()
+                    {
+                        valid = false,
+                        hipsIndex = -1,
+                        neckIndex = -1,
+                    };
                 }
             }
 
@@ -142,10 +156,7 @@ namespace PBD
             _skeletonShader.SetBuffer(_skeletonKernel, "_skeletonDataBuffer", _skeletonDataBuffer);
 
             Shader.SetGlobalBuffer(Shader.PropertyToID("_positionBuffer"), _positionBuffer); // for debug
-        }
 
-        public void SetSettings()
-        {
             _pbdShader.SetFloat("_velocityDamping", _velocityDamping);
             _pbdShader.SetBool("_useGravity", _useGravity);
             _pbdShader.SetInt("_connectionAmount", CONNECTION_AMOUNT);
@@ -155,9 +166,10 @@ namespace PBD
             _pbdShader.SetInt("_bonesAmount", _bones.length);
 
             _pointsDataBuffer.SetData(_pointsData);
+            _skeletonDataBuffer.SetData(_skeletonInfo);
         }
 
-        public void SetNewProperty(Type type, string name, object value) // не судите строго
+        public void SetNewProperty(Type type, string name, object value) // не судите строго, если эта штука будет не для дебага, перепишу на норм
         {
             if (type == typeof(float))
             {
@@ -189,6 +201,16 @@ namespace PBD
             AddPoint(hipsPosition, hipsRadius, 1, out var index1);
             AddPoint(neckPosition, neckRadius, 1, out var index2);
             AddConnection(index1, index2, stiffness);
+            int skeletonIndex = FindUnusedSkeletonIndex();
+            if (skeletonIndex == -1) throw new Exception($"Out of allocated memory for skeleton ({POINTS_AMOUNT / 2} elements), need to reallocate");
+
+            _skeletonInfo[skeletonIndex] = new PBDSkeletonInfo()
+            {
+                valid = true,
+                hipsIndex = index1,
+                neckIndex = index2
+            };
+            _skeletonDataBuffer.SetData(_skeletonInfo, skeletonIndex, skeletonIndex, 1);
         }
 
         public void AddPoint(Vector3 position, float radius, float mass, out int index)
@@ -264,7 +286,6 @@ namespace PBD
 
         public void OnUpdate(float deltaTime)
         {
-            
             _pbdShader.SetFloat("_deltaTime", deltaTime);
             _pbdShader.SetFloat("_prevDeltaTime", _prevDeltaTime);
             _prevDeltaTime = deltaTime;
@@ -346,19 +367,26 @@ namespace PBD
             return -1;
         }
 
+        private int FindUnusedSkeletonIndex()
+        {
+            // TODO find in removed first for optimization!
+            for (int i = 0; i < POINTS_AMOUNT / 2; i++)
+            {
+                if (!_skeletonInfo[i].valid) return i;
+            }
+
+            return -1;
+        }
+
         public void Dispose()
         {
-            //_transformAccessArray.Dispose();
+            AsyncGPUReadback.WaitAllRequests();
+            
             _pointsData.Dispose();
             _position.Dispose();
             _velocity.Dispose();
             _tempPosition.Dispose();
             _connectionData.Dispose();
-            // _connectionStiffness.Dispose();
-            // _connectionDistances.Dispose();
-            // _bones.Dispose();
-            // _bonesDistances.Dispose();
-            // _bonesExistence.Dispose();
             _sphereCastCommands.Dispose();
             _sphereCastHits.Dispose();
 
@@ -374,6 +402,7 @@ namespace PBD
             _bonesDataBuffer.Dispose();
 
             _skeletonDataBuffer.Dispose();
+            _skeletonInfo.Dispose();
         }
     }
 }

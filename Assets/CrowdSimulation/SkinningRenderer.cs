@@ -2,15 +2,10 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using BoneTransform = PBD.PBDSkeletonBoneTransform;
 
 public class SkinningRenderer : MonoBehaviour
 {
-    private struct BoneTransform
-    {
-        public Matrix4x4 Trs;
-        public int ParentIndex;
-    }
-
     [SerializeField] [Range(-1, 1)] private float _range;
     [SerializeField] private SkinnedMeshRenderer _skinnedMeshRenderer;
     [SerializeField] private Material _skinnedMaterial;
@@ -46,7 +41,7 @@ public class SkinningRenderer : MonoBehaviour
         {
             _boneTransforms[i] = new BoneTransform()
             {
-                Trs = GetTrsMatrix(_bones[i]),
+                Trs = Utils.GetTRS(_bones[i].localPosition, _bones[i].localRotation, _bones[i].localScale),
                 ParentIndex = _bones[i] == _skinnedMeshRenderer.rootBone ? -1 : Array.IndexOf(_bones, _bones[i].parent)
             };
             
@@ -94,7 +89,7 @@ public class SkinningRenderer : MonoBehaviour
 
     void Update()
     {
-        _boneTransforms[_rootBoneIndex].Trs = TRS(_testRootBone.position,_testRootBone.rotation, _testRootBone.localScale);
+        _boneTransforms[_rootBoneIndex].Trs = Utils.GetTRS(_testRootBone.position,_testRootBone.rotation, _testRootBone.localScale);
 
         for (var i = 0; i < _boneCount; i++)
         {
@@ -116,59 +111,5 @@ public class SkinningRenderer : MonoBehaviour
     {
         _weightsBuffer.Dispose();
         _indicesBuffer.Dispose();
-    }
-
-    private static Matrix4x4 GetTrsMatrix(Transform transform)
-    {
-        return TRS(transform.localPosition, transform.localRotation, transform.localScale);
-    }
-
-    private static Matrix4x4 TRS(Vector3 pos, Quaternion q, Vector3 s)
-    {
-        Matrix4x4 result = new Matrix4x4();
-        // Rotation and Scale
-        // Quaternion multiplication can be used to represent rotation. 
-        // If a quaternion is represented by qw + i qx + j qy + k qz , then the equivalent matrix for rotation is (including scale):
-        // Remarks: https://forums.inovaestudios.com/t/math-combining-a-translation-rotation-and-scale-matrix-question-to-you-math-magicians/5194/2
-        float sqw = q.w * q.w;
-        float sqx = q.x * q.x;
-        float sqy = q.y * q.y;
-        float sqz = q.z * q.z;
-        result.m00 = (1 - 2 * sqy - 2 * sqz) * s.x;
-        result.m01 = (2 * q.x * q.y - 2 * q.z * q.w);
-        result.m02 = (2 * q.x * q.z + 2 * q.y * q.w);
-        result.m10 = (2 * q.x * q.y + 2 * q.z * q.w);
-        result.m11 = (1 - 2 * sqx - 2 * sqz) * s.y;
-        result.m12 = (2 * q.y * q.z - 2 * q.x * q.w);
-        result.m20 = (2 * q.x * q.z - 2 * q.y * q.w);
-        result.m21 = (2 * q.y * q.z + 2 * q.x * q.w);
-        result.m22 = (1 - 2 * sqx - 2 * sqy) * s.z;
-        // Translation
-        result.m03 = pos.x;
-        result.m13 = pos.y;
-        result.m23 = pos.z;
-        result.m33 = 1.0f;
-        // Return result
-        return result;
-    }
-
-    private static Matrix4x4 Rotate(Quaternion q)
-    {
-        Matrix4x4 result = new Matrix4x4();
-        float sqw = q.w * q.w;
-        float sqx = q.x * q.x;
-        float sqy = q.y * q.y;
-        float sqz = q.z * q.z;
-        result.m00 = (1 - 2 * sqy - 2 * sqz);
-        result.m01 = (2 * q.x * q.y - 2 * q.z * q.w);
-        result.m02 = (2 * q.x * q.z + 2 * q.y * q.w);
-        result.m10 = (2 * q.x * q.y + 2 * q.z * q.w);
-        result.m11 = (1 - 2 * sqx - 2 * sqz);
-        result.m12 = (2 * q.y * q.z - 2 * q.x * q.w);
-        result.m20 = (2 * q.x * q.z - 2 * q.y * q.w);
-        result.m21 = (2 * q.y * q.z + 2 * q.x * q.w);
-        result.m22 = (1 - 2 * sqx - 2 * sqy);
-        result.m33 = 1.0f;
-        return result;
     }
 }

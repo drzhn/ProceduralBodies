@@ -9,7 +9,7 @@ struct PBDSkeletonInfo
 };
 
 StructuredBuffer<float3> _positionBuffer;
-RWStructuredBuffer<PBDSkeletonInfo> _skeletonDataBuffer; 
+StructuredBuffer<PBDSkeletonInfo> _skeletonDataBuffer; 
 RWStructuredBuffer<int> _neighboursUnitBuffer; // тут мы будем хранить вторую часть юнита каждой точки. L = POINT_AMOUNT
 RWStructuredBuffer<int> _neighboursBuffer; // тут мы будем хранить ближайшего соседа каждой точки (исключая ближайшую из юнита)
 
