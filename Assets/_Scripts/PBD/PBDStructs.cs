@@ -1,4 +1,5 @@
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using UnityEngine;
 using UnityEngine.Jobs;
@@ -7,7 +8,7 @@ namespace PBD
 {
     public struct PBDPointInfo
     {
-        public int valid;
+        public bool valid;
         public float mass;
         public float radius;
     }
@@ -49,13 +50,17 @@ namespace PBD
     {
         public NativeArray<SpherecastCommand> Spherecasts;
         [ReadOnly] public NativeArray<PBDPointInfo> pointsData;
-        [ReadOnly] public NativeArray<Vector3> oldPositions;
-        [ReadOnly] public NativeArray<Vector3> newPositions;
+
+        [NativeDisableContainerSafetyRestriction] [ReadOnly]
+        public NativeArray<Vector3> oldPositions;
+
+        [NativeDisableContainerSafetyRestriction] [ReadOnly]
+        public NativeArray<Vector3> newPositions;
 
 
         public void Execute(int i)
         {
-            if (pointsData[i].valid == 0) return;
+            if (!pointsData[i].valid) return;
 
             Spherecasts[i] = new SpherecastCommand(
                 oldPositions[i],
@@ -69,12 +74,16 @@ namespace PBD
     {
         [ReadOnly] public NativeArray<RaycastHit> Hits;
         [ReadOnly] public NativeArray<PBDPointInfo> pointsData;
+
+        [NativeDisableContainerSafetyRestriction]
         public NativeArray<Vector3> oldPositions;
+
+        [NativeDisableContainerSafetyRestriction]
         public NativeArray<Vector3> newPositions;
 
         public void Execute(int i)
         {
-            if (pointsData[i].valid == 0) return;
+            if (!pointsData[i].valid) return;
 
             if (Hits[i].normal == Vector3.zero) return;
 

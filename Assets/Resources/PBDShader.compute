@@ -3,7 +3,7 @@
 
 struct PBDPointInfo
 {
-     int valid;
+     bool valid;
      float mass;
      float radius;
 };
@@ -53,7 +53,7 @@ float _boneStiffness;
 [numthreads(POINT_AMOUNT,1,1)]
 void PBD (uint3 id : SV_DispatchThreadID)
 {
-    if (_pointsDataBuffer[id.x].valid == 1)
+    if (_pointsDataBuffer[id.x].valid)
     {
         _velocityBuffer[id.x] = float3(0,0,0);
         if (_prevDeltaTime > 0) // обрабатываем инфу с предыдущего кадра
@@ -97,7 +97,7 @@ void PBD (uint3 id : SV_DispatchThreadID)
             // Collisions with other points
             for (uint j = 0; j < POINT_AMOUNT; j ++)
             {
-                if (_pointsDataBuffer[j].valid == 1 && j != id.x)
+                if (_pointsDataBuffer[j].valid && j != id.x)
                 {
                     float currentDistance = length(_tempPositionBuffer[j] - _tempPositionBuffer[id.x]);
                     float desiredDistance = _pointsDataBuffer[id.x].radius + _pointsDataBuffer[j].radius;

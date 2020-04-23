@@ -4,6 +4,7 @@ using Unity.Collections;
 using Unity.Jobs;
 using UnityEngine;
 using UnityEngine.Jobs;
+using UnityEngine.Rendering;
 
 namespace PBD
 {
@@ -102,7 +103,7 @@ namespace PBD
             {
                 _pointsData[i] = new PBDPointInfo()
                 {
-                    valid = 0,
+                    valid = false,
                     mass = 0,
                     radius = 0
                 };
@@ -197,7 +198,7 @@ namespace PBD
 
             _pointsData[index] = new PBDPointInfo()
             {
-                valid = 1,
+                valid = true,
                 mass = mass,
                 radius = radius,
             };
@@ -258,14 +259,15 @@ namespace PBD
 
 
         private JobHandle _lastHandle;
-        private float _prevDeltaTime;
-        private readonly Vector3[] _data = new Vector3[POINTS_AMOUNT];
+        private float _prevDeltaTime = 0f;
 
 
         public void OnUpdate(float deltaTime)
         {
+            
             _pbdShader.SetFloat("_deltaTime", deltaTime);
             _pbdShader.SetFloat("_prevDeltaTime", _prevDeltaTime);
+            _prevDeltaTime = deltaTime;
 
             var prepareBonesJob = new PrepareBonesPositionCommands()
             {
@@ -277,18 +279,12 @@ namespace PBD
 
             _pbdShader.Dispatch(_pbdKernel, 1, 1, 1);
 
-            _prevDeltaTime = deltaTime;
-
-
-            _tempPositionBuffer.GetData(_data); // TODO waiting for better api without allocation
-            _tempPosition.CopyFrom(_data);
-
-            _positionBuffer.GetData(_data);
-            _position.CopyFrom(_data);
+            AsyncGPUReadback.RequestIntoNativeArray(ref _position, _positionBuffer);
+            AsyncGPUReadback.RequestIntoNativeArray(ref _tempPosition, _tempPositionBuffer);
+            AsyncGPUReadback.WaitAllRequests();
 
             var sphereCastCommands = new NativeArray<SpherecastCommand>(_pointsData.Length, Allocator.TempJob);
             var sphereCastHits = new NativeArray<RaycastHit>(_pointsData.Length, Allocator.TempJob);
-
             var setupSpherecastCommands = new PrepareSpherecastCommands()
             {
                 Spherecasts = sphereCastCommands,
@@ -328,7 +324,7 @@ namespace PBD
         {
             for (int i = 0; i < _pointsData.Length; i++)
             {
-                if (_pointsData[i].valid == 0) return i;
+                if (!_pointsData[i].valid) return i;
             }
 
             return -1;
