@@ -76,6 +76,7 @@ public class PBDCreatorTest : MonoBehaviour
 
     private readonly Bounds _drawingBounds = new Bounds(Vector3.zero, new Vector3(100.0f, 100.0f, 100.0f));
 
+    private int _unitsAmound = 0;
     private void Update()
     {
         _pbd.OnGraphicsUpdate();
@@ -93,6 +94,12 @@ public class PBDCreatorTest : MonoBehaviour
                 _debugInstancedMaterial,
                 _drawingBounds,
                 _argsBuffer);
+        }
+
+        if (_unitsAmound < 500)
+        {
+            AddUnit();
+            _unitsAmound++;
         }
     }
 

@@ -17473,7 +17473,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1220929135}
   m_LocalRotation: {x: -0, y: -0.80996907, z: -0, w: 0.5864727}
-  m_LocalPosition: {x: 15.34, y: 5.95, z: 25.14}
+  m_LocalPosition: {x: 13.14, y: 3.85, z: 1.48}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
@@ -19899,13 +19899,13 @@ MonoBehaviour:
   _instancedMaterial: {fileID: 2100000, guid: aadc14e78b7380a4cbd21b5ed1d5169b, type: 2}
   _rootBone: {fileID: 1449895041}
   _amountPerDimension: 10
-  _radius: 0.553
+  _radius: 0.312
   _stiffness: 0.177
   _collisionStiffness: 0.52
   _boneStiffness: 0.001
   _damping: 0.975
   _useGravity: 0
-  _debugPoints: 1
+  _debugPoints: 0
   _debugInstancedMaterial: {fileID: 2100000, guid: 0b3ae9784e92de04ab285bf55e90617e, type: 2}
 --- !u!4 &1486022503
 Transform:
