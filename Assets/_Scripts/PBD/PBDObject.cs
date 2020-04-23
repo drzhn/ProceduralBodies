@@ -14,9 +14,11 @@ namespace PBD
 
         // General settings
         private const int POINTS_AMOUNT = 1024; // we allocate all points data once and use special arrays for existence check
+        private const int SKELETON_BONES_AMOUNT = 100;
 
         private const int CONNECTION_AMOUNT = 32; // how many connections may have each point
         private const int SOLVER_STEPS = 3;
+        private readonly Bounds _bounds = new Bounds(Vector3.zero, Vector3.one * 100f);
 
         // Object settings
         private readonly float _pointCollisionStiffness; // when 2 points collide
@@ -49,6 +51,13 @@ namespace PBD
         private readonly ComputeBuffer _connectionDataBuffer;
         private readonly ComputeBuffer _bonesDataBuffer;
         private readonly ComputeBuffer _skeletonDataBuffer;
+        private readonly ComputeBuffer _boneMatricesBuffer;
+        private readonly ComputeBuffer _skeletonBoneTransformBuffer;
+        private readonly ComputeBuffer _weightsBuffer;
+        private readonly ComputeBuffer _indicesBuffer;
+        private readonly ComputeBuffer _bindPosesBuffer;
+        private readonly ComputeBuffer _argsBuffer;
+
 
         // spherecast batching data
         private NativeArray<SpherecastCommand> _sphereCastCommands; // for batching spherecast
@@ -59,14 +68,61 @@ namespace PBD
         private TransformAccessArray _bones;
         private NativeArray<PBDBoneInfo> _bonesData;
 
+        // Instanced drawing data
+        private PBDModelData _modelData;
+        private Material _instancedMaterial;
+
         public PBDObject(
             float pointCollisionStiffness,
             float boneStiffness,
             float velocityDamping,
             bool useGravity,
-            Transform rootBone
+            Transform rootBone,
+            PBDModelData modelData,
+            Material instancedMaterial
         )
         {
+            // Instanced material initialization
+
+            _modelData = modelData;
+            _instancedMaterial = instancedMaterial;
+            _modelData.GetVerticesData(out var vertexWeights, out var vertexBoneIndices);
+            _weightsBuffer = new ComputeBuffer(vertexWeights.Length, sizeof(float));
+            _weightsBuffer.SetData(vertexWeights);
+
+            _indicesBuffer = new ComputeBuffer(vertexBoneIndices.Length, sizeof(int));
+            _indicesBuffer.SetData(vertexBoneIndices);
+
+            _boneMatricesBuffer = new ComputeBuffer(POINTS_AMOUNT / 2 * SKELETON_BONES_AMOUNT, Marshal.SizeOf<Matrix4x4>());
+            _skeletonBoneTransformBuffer = new ComputeBuffer(POINTS_AMOUNT / 2 * SKELETON_BONES_AMOUNT, Marshal.SizeOf<PBDSkeletonBoneTransform>());
+
+            for (int i = 0; i < POINTS_AMOUNT / 2; i++)
+            {
+                _skeletonBoneTransformBuffer.SetData(
+                    _modelData.SkeletonBoneTransforms,
+                    0,
+                    i * SKELETON_BONES_AMOUNT,
+                    _modelData.SkeletonBoneTransforms.Length);
+            }
+
+            _bindPosesBuffer = new ComputeBuffer(SKELETON_BONES_AMOUNT, Marshal.SizeOf<Matrix4x4>());
+            _bindPosesBuffer.SetData(_modelData.BindPoses, 0, 0, _modelData.BindPoses.Length);
+
+            _instancedMaterial.SetBuffer("_VertexWeights", _weightsBuffer);
+            _instancedMaterial.SetBuffer("_VertexBoneIndices", _indicesBuffer);
+            _instancedMaterial.SetBuffer("_BonesMatrices", _boneMatricesBuffer);
+
+            int[] args = new int[5] {0, 0, 0, 0, 0};
+            _argsBuffer = new ComputeBuffer(1, args.Length * sizeof(uint), ComputeBufferType.IndirectArguments);
+            args[0] = (int) _modelData.Mesh.GetIndexCount(0);
+            args[1] = POINTS_AMOUNT / 2;
+            args[2] = (int) _modelData.Mesh.GetIndexStart(0);
+            args[3] = (int) _modelData.Mesh.GetBaseVertex(0);
+
+            _argsBuffer.SetData(args);
+
+            // PBD body bone initialization
+
             _rootBone = rootBone;
             var bonesArray = new Transform[_rootBone.childCount + 1];
             bonesArray[0] = _rootBone;
@@ -84,6 +140,7 @@ namespace PBD
                 Debug.Log($"bones {i} position {_bonesData[i].position} parent {_bonesData[i].parentIndex}");
             }
 
+            // PBD initialization
 
             _boneStiffness = boneStiffness;
             _pointCollisionStiffness = pointCollisionStiffness;
@@ -120,7 +177,7 @@ namespace PBD
 
                 if (i % 2 == 0)
                 {
-                    _skeletonInfo[i/2] = new PBDSkeletonInfo()
+                    _skeletonInfo[i / 2] = new PBDSkeletonInfo()
                     {
                         valid = false,
                         hipsIndex = -1,
@@ -154,6 +211,11 @@ namespace PBD
 
             _skeletonShader.SetBuffer(_skeletonKernel, "_positionBuffer", _positionBuffer);
             _skeletonShader.SetBuffer(_skeletonKernel, "_skeletonDataBuffer", _skeletonDataBuffer);
+            _skeletonShader.SetBuffer(_skeletonKernel, "_skeletonBoneTransformBuffer", _skeletonBoneTransformBuffer);
+            _skeletonShader.SetBuffer(_skeletonKernel, "_boneMatrices", _boneMatricesBuffer);
+            _skeletonShader.SetBuffer(_skeletonKernel, "_bindPosesBuffer", _bindPosesBuffer);
+            _skeletonShader.SetInt("_bonesAmount", _modelData.BindPoses.Length);
+
 
             Shader.SetGlobalBuffer(Shader.PropertyToID("_positionBuffer"), _positionBuffer); // for debug
 
@@ -284,7 +346,7 @@ namespace PBD
         private float _prevDeltaTime = 0f;
 
 
-        public void OnUpdate(float deltaTime)
+        public void OnPhysicsUpdate(float deltaTime)
         {
             _pbdShader.SetFloat("_deltaTime", deltaTime);
             _pbdShader.SetFloat("_prevDeltaTime", _prevDeltaTime);
@@ -341,6 +403,19 @@ namespace PBD
             sphereCastHits.Dispose();
         }
 
+        public void OnGraphicsUpdate()
+        {
+            _skeletonShader.Dispatch(_skeletonKernel,1,1,1);
+            
+            Graphics.DrawMeshInstancedIndirect(
+                _modelData.Mesh,
+                0,
+                _instancedMaterial,
+                _bounds,
+                _argsBuffer
+            );
+        }
+
         private int FindUnusedPointIndex()
         {
             for (int i = 0; i < _pointsData.Length; i++)
@@ -381,7 +456,7 @@ namespace PBD
         public void Dispose()
         {
             AsyncGPUReadback.WaitAllRequests();
-            
+
             _pointsData.Dispose();
             _position.Dispose();
             _velocity.Dispose();
@@ -403,6 +478,13 @@ namespace PBD
 
             _skeletonDataBuffer.Dispose();
             _skeletonInfo.Dispose();
+
+            _weightsBuffer.Dispose();
+            _indicesBuffer.Dispose();
+            _boneMatricesBuffer.Dispose();
+            _skeletonBoneTransformBuffer.Dispose();
+            _bindPosesBuffer.Dispose();
+            _argsBuffer.Dispose();
         }
     }
 }

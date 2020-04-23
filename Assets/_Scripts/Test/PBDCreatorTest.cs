@@ -6,8 +6,9 @@ using UnityEngine;
 
 public class PBDCreatorTest : MonoBehaviour
 {
-    [SerializeField] private Transform _rootBone;
+    [SerializeField] private PBDModelData _modelData;
     [SerializeField] private Material _instancedMaterial;
+    [SerializeField] [Space] private Transform _rootBone;
     [SerializeField] private int _amountPerDimension;
     [SerializeField] [Range(0, 1)] private float _radius;
     [SerializeField] [Range(0, 1)] private float _stiffness;
@@ -15,7 +16,11 @@ public class PBDCreatorTest : MonoBehaviour
     [SerializeField] [Range(0, 1)] private float _boneStiffness;
     [SerializeField] [Range(0, 1)] private float _damping;
     [SerializeField] private bool _useGravity;
-    [SerializeField] [Space] private bool _debugPoints;
+
+    [SerializeField] [Space] [Header("DEBUG")]
+    private bool _debugPoints;
+
+    [SerializeField] private Material _debugInstancedMaterial;
 
 
     private PBDConnectionTest[] _connections;
@@ -50,7 +55,7 @@ public class PBDCreatorTest : MonoBehaviour
 ////            _pbd.AddConnection(_points[connection.transform], _points[connection.connectedPoint], _stiffness);
 //        }
 
-        _pbd = new PBDObject(_collisionStiffness, _boneStiffness, _damping, _useGravity, _rootBone);
+        _pbd = new PBDObject(_collisionStiffness, _boneStiffness, _damping, _useGravity, _rootBone, _modelData, _instancedMaterial);
 
         // for (int x = 0; x < _amountPerDimension; x++)
         // {
@@ -73,6 +78,8 @@ public class PBDCreatorTest : MonoBehaviour
 
     private void Update()
     {
+        _pbd.OnGraphicsUpdate();
+
         if (_debugPoints)
         {
             if (_argsBuffer == null)
@@ -83,10 +90,15 @@ public class PBDCreatorTest : MonoBehaviour
             Graphics.DrawMeshInstancedIndirect(
                 _debugMesh,
                 0,
-                _instancedMaterial,
+                _debugInstancedMaterial,
                 _drawingBounds,
                 _argsBuffer);
         }
+    }
+
+    void FixedUpdate()
+    {
+        _pbd.OnPhysicsUpdate(Time.fixedDeltaTime);
     }
 
     private void OnGUI()
@@ -106,11 +118,6 @@ public class PBDCreatorTest : MonoBehaviour
             _radius,
             _stiffness
         );
-    }
-
-    void FixedUpdate()
-    {
-        _pbd.OnUpdate(Time.fixedDeltaTime);
     }
 
     private void PrepareDebugMesh()

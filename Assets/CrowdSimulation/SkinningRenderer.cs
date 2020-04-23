@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using UnityEngine;
 using BoneTransform = PBD.PBDSkeletonBoneTransform;
 
@@ -24,6 +25,7 @@ public class SkinningRenderer : MonoBehaviour
     private int[] _vertexBoneIndices;
     private ComputeBuffer _weightsBuffer;
     private ComputeBuffer _indicesBuffer;
+    private ComputeBuffer _bonesBuffer;
 
     private GameObject _meshContainer;
     private Matrix4x4[] _bindPoses;
@@ -44,7 +46,7 @@ public class SkinningRenderer : MonoBehaviour
                 Trs = Utils.GetTRS(_bones[i].localPosition, _bones[i].localRotation, _bones[i].localScale),
                 ParentIndex = _bones[i] == _skinnedMeshRenderer.rootBone ? -1 : Array.IndexOf(_bones, _bones[i].parent)
             };
-            
+
             if (_boneTransforms[i].ParentIndex == -1) _rootBoneIndex = i;
         }
 
@@ -81,6 +83,10 @@ public class SkinningRenderer : MonoBehaviour
         _meshRenderer.material.SetBuffer("_VertexWeights", _weightsBuffer);
         _meshRenderer.material.SetBuffer("_VertexBoneIndices", _indicesBuffer);
 
+
+        _bonesBuffer = new ComputeBuffer(100, Marshal.SizeOf<Matrix4x4>());
+        _meshRenderer.material.SetBuffer("_BonesMatrices", _bonesBuffer);
+
         _bindPoses = _meshFilter.mesh.bindposes;
 
         Debug.Log($"Bone amount: {_boneCount}");
@@ -89,7 +95,7 @@ public class SkinningRenderer : MonoBehaviour
 
     void Update()
     {
-        _boneTransforms[_rootBoneIndex].Trs = Utils.GetTRS(_testRootBone.position,_testRootBone.rotation, _testRootBone.localScale);
+        _boneTransforms[_rootBoneIndex].Trs = Utils.GetTRS(_testRootBone.position, _testRootBone.rotation, _testRootBone.localScale);
 
         for (var i = 0; i < _boneCount; i++)
         {
@@ -104,7 +110,7 @@ public class SkinningRenderer : MonoBehaviour
             _bonesMatrices[i] = m * _bindPoses[i];
         }
 
-        _meshRenderer.material.SetMatrixArray(BonesMatrices, _bonesMatrices);
+        _bonesBuffer.SetData(_bonesMatrices);
     }
 
     private void OnDestroy()

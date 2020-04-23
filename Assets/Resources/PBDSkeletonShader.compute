@@ -1,5 +1,6 @@
 ﻿#pragma kernel Skeleton
 #define UNITS_AMOUNT 512
+#define BONES_AMOUNT 100
 
 struct PBDSkeletonInfo
 {
@@ -8,12 +9,36 @@ struct PBDSkeletonInfo
     int neckIndex;
 };
 
+struct PBDSkeletonBoneTransform
+{
+    float4x4 Trs;
+    int ParentIndex;
+};
+
 StructuredBuffer<float3> _positionBuffer;
 StructuredBuffer<PBDSkeletonInfo> _skeletonDataBuffer; 
+RWStructuredBuffer<PBDSkeletonBoneTransform> _skeletonBoneTransformBuffer;
+StructuredBuffer<float4x4> _bindPosesBuffer;
+
+RWStructuredBuffer<float4x4> _boneMatrices;
+
 RWStructuredBuffer<int> _neighboursUnitBuffer; // тут мы будем хранить вторую часть юнита каждой точки. L = POINT_AMOUNT
 RWStructuredBuffer<int> _neighboursBuffer; // тут мы будем хранить ближайшего соседа каждой точки (исключая ближайшую из юнита)
+
+int _bonesAmount;
 
 [numthreads(UNITS_AMOUNT,1,1)]
 void Skeleton (uint3 id : SV_DispatchThreadID)
 {
+    for (int i = 0; i < _bonesAmount; i++)
+    {
+        float4x4 m = _skeletonBoneTransformBuffer[id.x * BONES_AMOUNT + i].Trs;
+        int parentIndex = _skeletonBoneTransformBuffer[id.x * BONES_AMOUNT + i].ParentIndex;
+        while (parentIndex != -1)
+        {
+            m = mul(_skeletonBoneTransformBuffer[id.x * BONES_AMOUNT + parentIndex].Trs, m);
+            parentIndex = _skeletonBoneTransformBuffer[id.x * BONES_AMOUNT + parentIndex].ParentIndex;
+        }
+        _boneMatrices[id.x * BONES_AMOUNT + i] = mul(m, _bindPosesBuffer[i]);
+    }   
 }
