@@ -12,8 +12,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b9746579ed1e9594596ddb3fdd903345, type: 3}
   m_Name: PBDModelData
   m_EditorClassIdentifier: 
-  Prefab: {fileID: 100004, guid: 85d938798cd2f1443a0a3fc3a0729f02, type: 3}
+  Prefab: {fileID: 300441094620709514, guid: 5652d8de11bb5784fad52d962f0d3f53, type: 3}
   Mesh: {fileID: 4300000, guid: 85d938798cd2f1443a0a3fc3a0729f02, type: 3}
+  LeftHand: {x: 0, y: 0, z: 0}
+  RightHand: {x: 0, y: 0, z: 0}
+  LeftFoot: {x: 0, y: 0, z: 0}
+  RightFoot: {x: 0, y: 0, z: 0}
   BindPoses:
   - e00: 1
     e01: 3.6379788e-10

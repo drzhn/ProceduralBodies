@@ -36,8 +36,8 @@ namespace PBD
         // stretching data
         private NativeArray<PBDConnectionInfo> _connectionData; // data containing connection information between points. count = POINTS_AMOUNT * STRETCHING_CAPACITY (2d array repr.)
 
-        // skeleton data
-        private NativeArray<PBDSkeletonInfo> _skeletonInfo;
+        // per unit data
+        private NativeArray<PBDUnitData> _unitData;
 
         // compute shader data
         private readonly ComputeShader _pbdShader;
@@ -50,9 +50,12 @@ namespace PBD
         private readonly ComputeBuffer _tempPositionBuffer;
         private readonly ComputeBuffer _connectionDataBuffer;
         private readonly ComputeBuffer _bonesDataBuffer;
+
+        private readonly ComputeBuffer _unitDataBuffer;
         private readonly ComputeBuffer _skeletonDataBuffer;
-        private readonly ComputeBuffer _boneMatricesBuffer;
         private readonly ComputeBuffer _skeletonBoneTransformBuffer;
+
+        private readonly ComputeBuffer _boneMatricesBuffer;
         private readonly ComputeBuffer _weightsBuffer;
         private readonly ComputeBuffer _indicesBuffer;
         private readonly ComputeBuffer _bindPosesBuffer;
@@ -108,6 +111,12 @@ namespace PBD
             _bindPosesBuffer = new ComputeBuffer(SKELETON_BONES_AMOUNT, Marshal.SizeOf<Matrix4x4>());
             _bindPosesBuffer.SetData(_modelData.BindPoses, 0, 0, _modelData.BindPoses.Length);
 
+            _skeletonDataBuffer = new ComputeBuffer(1, Marshal.SizeOf<PBDSkeletonData>());
+            _skeletonDataBuffer.SetData(new PBDSkeletonData[]
+            {
+                _modelData.SkeletonData
+            });
+
             _instancedMaterial.SetBuffer("_VertexWeights", _weightsBuffer);
             _instancedMaterial.SetBuffer("_VertexBoneIndices", _indicesBuffer);
             _instancedMaterial.SetBuffer("_BonesMatrices", _boneMatricesBuffer);
@@ -157,7 +166,7 @@ namespace PBD
             _sphereCastCommands = new NativeArray<SpherecastCommand>(POINTS_AMOUNT, Allocator.Persistent);
             _sphereCastHits = new NativeArray<RaycastHit>(POINTS_AMOUNT, Allocator.Persistent);
 
-            _skeletonInfo = new NativeArray<PBDSkeletonInfo>(POINTS_AMOUNT / 2, Allocator.Persistent);
+            _unitData = new NativeArray<PBDUnitData>(POINTS_AMOUNT / 2, Allocator.Persistent);
 
 
             for (int i = 0; i < POINTS_AMOUNT; i++)
@@ -177,7 +186,7 @@ namespace PBD
 
                 if (i % 2 == 0)
                 {
-                    _skeletonInfo[i / 2] = new PBDSkeletonInfo()
+                    _unitData[i / 2] = new PBDUnitData()
                     {
                         valid = false,
                         hipsIndex = -1,
@@ -200,7 +209,7 @@ namespace PBD
             _tempPositionBuffer = new ComputeBuffer(POINTS_AMOUNT, Marshal.SizeOf<Vector3>());
             _connectionDataBuffer = new ComputeBuffer(POINTS_AMOUNT * CONNECTION_AMOUNT, Marshal.SizeOf<PBDConnectionInfo>());
             _bonesDataBuffer = new ComputeBuffer(_rootBone.childCount + 1, Marshal.SizeOf<PBDBoneInfo>());
-            _skeletonDataBuffer = new ComputeBuffer(POINTS_AMOUNT / 2, Marshal.SizeOf<PBDSkeletonInfo>());
+            _unitDataBuffer = new ComputeBuffer(POINTS_AMOUNT / 2, Marshal.SizeOf<PBDUnitData>());
 
             _pbdShader.SetBuffer(_pbdKernel, "_pointsDataBuffer", _pointsDataBuffer);
             _pbdShader.SetBuffer(_pbdKernel, "_positionBuffer", _positionBuffer);
@@ -210,8 +219,9 @@ namespace PBD
             _pbdShader.SetBuffer(_pbdKernel, "_bonesDataBuffer", _bonesDataBuffer);
 
             _skeletonShader.SetBuffer(_skeletonKernel, "_positionBuffer", _positionBuffer);
-            _skeletonShader.SetBuffer(_skeletonKernel, "_skeletonDataBuffer", _skeletonDataBuffer);
+            _skeletonShader.SetBuffer(_skeletonKernel, "_unitDataBuffer", _unitDataBuffer);
             _skeletonShader.SetBuffer(_skeletonKernel, "_skeletonBoneTransformBuffer", _skeletonBoneTransformBuffer);
+            _skeletonShader.SetBuffer(_skeletonKernel, "_skeletonDataBuffer", _skeletonDataBuffer);
             _skeletonShader.SetBuffer(_skeletonKernel, "_boneMatrices", _boneMatricesBuffer);
             _skeletonShader.SetBuffer(_skeletonKernel, "_bindPosesBuffer", _bindPosesBuffer);
             _skeletonShader.SetInt("_bonesAmount", _modelData.BindPoses.Length);
@@ -229,7 +239,7 @@ namespace PBD
             _pbdShader.SetInt("_bonesAmount", _bones.length);
 
             _pointsDataBuffer.SetData(_pointsData);
-            _skeletonDataBuffer.SetData(_skeletonInfo);
+            _unitDataBuffer.SetData(_unitData);
         }
 
         public void SetNewProperty(Type type, string name, object value) // не судите строго, если эта штука будет не для дебага, перепишу на норм
@@ -266,13 +276,13 @@ namespace PBD
             int skeletonIndex = FindUnusedSkeletonIndex();
             if (skeletonIndex == -1) throw new Exception($"Out of allocated memory for skeleton ({POINTS_AMOUNT / 2} elements), need to reallocate");
 
-            _skeletonInfo[skeletonIndex] = new PBDSkeletonInfo()
+            _unitData[skeletonIndex] = new PBDUnitData()
             {
                 valid = true,
                 hipsIndex = index1,
                 neckIndex = index2
             };
-            _skeletonDataBuffer.SetData(_skeletonInfo, skeletonIndex, skeletonIndex, 1);
+            _unitDataBuffer.SetData(_unitData, skeletonIndex, skeletonIndex, 1);
         }
 
         public void AddPoint(Vector3 position, float radius, float mass, out int index)
@@ -405,8 +415,8 @@ namespace PBD
 
         public void OnGraphicsUpdate()
         {
-            _skeletonShader.Dispatch(_skeletonKernel,1,1,1);
-            
+            _skeletonShader.Dispatch(_skeletonKernel, 1, 1, 1);
+
             Graphics.DrawMeshInstancedIndirect(
                 _modelData.Mesh,
                 0,
@@ -447,7 +457,7 @@ namespace PBD
             // TODO find in removed first for optimization!
             for (int i = 0; i < POINTS_AMOUNT / 2; i++)
             {
-                if (!_skeletonInfo[i].valid) return i;
+                if (!_unitData[i].valid) return i;
             }
 
             return -1;
@@ -476,8 +486,9 @@ namespace PBD
             _bonesData.Dispose();
             _bonesDataBuffer.Dispose();
 
+            _unitDataBuffer.Dispose();
+            _unitData.Dispose();
             _skeletonDataBuffer.Dispose();
-            _skeletonInfo.Dispose();
 
             _weightsBuffer.Dispose();
             _indicesBuffer.Dispose();

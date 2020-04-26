@@ -250,4 +250,24 @@ float4x4 extract_rotation_matrix(float4x4 m)
     return m;
 }
 
+float3 extract_position(float4x4 m)
+{
+    return float3(m[3][0], m[3][1], m[3][2]);
+}
+
+float3 extract_scale(float4x4 m)
+{
+    float sx = length(float3(m[0][0], m[0][1], m[0][2]));
+    float sy = length(float3(m[1][0], m[1][1], m[1][2]));
+    float sz = length(float3(m[2][0], m[2][1], m[2][2]));
+
+    // if determine is negative, we need to invert one scale
+    float det = determinant(m);
+    if (det < 0) {
+        sx = -sx;
+    }
+
+    return float3(sx,sy,sz);
+}
+
 #endif // __MATRIX_INCLUDED__

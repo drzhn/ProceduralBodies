@@ -17,6 +17,9 @@ namespace PBD
                 UpdateBoneData();
             }
 
+            EditorGUILayout.LabelField("[ATTENTION] Try not to change these properties!");
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("SkeletonData"));
+
             EditorGUILayout.PropertyField(serializedObject.FindProperty("Mesh"));
             EditorGUILayout.PropertyField(serializedObject.FindProperty("RootBoneIndex"));
             EditorGUILayout.PropertyField(serializedObject.FindProperty("BindPoses"));
@@ -52,6 +55,18 @@ namespace PBD
 
                 if (obj.SkeletonBoneTransforms[i].ParentIndex == -1) obj.RootBoneIndex = i;
             }
+
+            var skeletonData = new PBDSkeletonData();
+            PBDSkeletonBoneContainer boneContainer = obj.Prefab.GetComponentInChildren<PBDSkeletonBoneContainer>();
+            for (var i = 0; i < 3; i++)
+            {
+                skeletonData.leftHand[i] = Array.IndexOf(bones, boneContainer.LeftHand[i]);
+                skeletonData.rightHand[i] = Array.IndexOf(bones, boneContainer.RightHand[i]);
+                skeletonData.leftFoot[i] = Array.IndexOf(bones, boneContainer.LeftFoot[i]);
+                skeletonData.rightFoot[i] = Array.IndexOf(bones, boneContainer.RightFoot[i]);
+            }
+
+            obj.SkeletonData = skeletonData;
         }
     }
 }

@@ -27,13 +27,22 @@ namespace PBD
         public int parentIndex;
     }
 
-    public struct PBDSkeletonInfo
+    public struct PBDUnitData // Data per certain instantiated unit
     {
         public bool valid;
         public int hipsIndex;
         public int neckIndex;
     }
-    
+
+    [Serializable]
+    public struct PBDSkeletonData // Data per skeleton type
+    {
+        public Vector3Int leftHand;
+        public Vector3Int rightHand;
+        public Vector3Int leftFoot;
+        public Vector3Int rightFoot;
+    }
+
     [Serializable]
     public struct PBDSkeletonBoneTransform
     {

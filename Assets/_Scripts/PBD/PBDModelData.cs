@@ -10,6 +10,8 @@ namespace PBD
     {
         public GameObject Prefab;
         public Mesh Mesh;
+        public PBDSkeletonData SkeletonData;
+        
         public Matrix4x4[] BindPoses;
         public PBDSkeletonBoneTransform[] SkeletonBoneTransforms;
         public int RootBoneIndex;
