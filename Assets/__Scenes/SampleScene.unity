@@ -5047,7 +5047,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!54 &1477107772
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -5147,7 +5147,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _modelData: {fileID: 11400000, guid: 21f12c700f5945644803558ae46d1cdb, type: 2}
   _instancedMaterial: {fileID: 2100000, guid: aadc14e78b7380a4cbd21b5ed1d5169b, type: 2}
-  _rootBone: {fileID: 1477107777}
+  _rootBone: {fileID: 1449895041}
   _amountPerDimension: 10
   _radius: 0.312
   _stiffness: 0.177
@@ -5155,7 +5155,7 @@ MonoBehaviour:
   _boneStiffness: 0.001
   _damping: 0.975
   _useGravity: 0
-  _debugPoints: 0
+  _debugPoints: 1
   _debugInstancedMaterial: {fileID: 2100000, guid: 0b3ae9784e92de04ab285bf55e90617e, type: 2}
 --- !u!4 &1486022503
 Transform:

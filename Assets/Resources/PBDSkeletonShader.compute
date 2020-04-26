@@ -1,7 +1,10 @@
 ﻿#pragma kernel Skeleton
+
+#include "Quaternion.cginc"
+#include "Matrix.cginc"
+
 #define UNITS_AMOUNT 512
 #define BONES_AMOUNT 100
-#define QUATERNION_IDENTITY float4(0, 0, 0, 1)
 
 struct PBDSkeletonInfo
 {
@@ -15,109 +18,6 @@ struct PBDSkeletonBoneTransform
     float4x4 Trs;
     int ParentIndex;
 };
-
-float4 qmul(float4 q1, float4 q2)
-{
-    return float4(
-        q2.xyz * q1.w + q1.xyz * q2.w + cross(q1.xyz, q2.xyz),
-        q1.w * q2.w - dot(q1.xyz, q2.xyz)
-    );
-}
-
-inline float4 quat_axis_angle(float3 v, float a)
-{
-  float h = 0.5 * a;
-  return float4(sin(h) * normalize(v), cos(h));
-}
-
-inline float4 q_look_at(float3 forward, float3 up)
-{
-    forward = normalize(forward);
-    float3 right = normalize(cross(forward, up));
-    up = normalize(cross(forward, right));
-
-    float m00 = right.x;
-    float m01 = right.y;
-    float m02 = right.z;
-    float m10 = up.x;
-    float m11 = up.y;
-    float m12 = up.z;
-    float m20 = forward.x;
-    float m21 = forward.y;
-    float m22 = forward.z;
-
-    float num8 = (m00 + m11) + m22;
-    float4 q = QUATERNION_IDENTITY;
-    if (num8 > 0.0)
-    {
-        float num = sqrt(num8 + 1.0);
-        q.w = num * 0.5;
-        num = 0.5 / num;
-        q.x = (m12 - m21) * num;
-        q.y = (m20 - m02) * num;
-        q.z = (m01 - m10) * num;
-        return q;
-    }
-
-    if ((m00 >= m11) && (m00 >= m22))
-    {
-        float num7 = sqrt(((1.0 + m00) - m11) - m22);
-        float num4 = 0.5 / num7;
-        q.x = 0.5 * num7;
-        q.y = (m01 + m10) * num4;
-        q.z = (m02 + m20) * num4;
-        q.w = (m12 - m21) * num4;
-        return q;
-    }
-
-    if (m11 > m22)
-    {
-        float num6 = sqrt(((1.0 + m11) - m00) - m22);
-        float num3 = 0.5 / num6;
-        q.x = (m10 + m01) * num3;
-        q.y = 0.5 * num6;
-        q.z = (m21 + m12) * num3;
-        q.w = (m20 - m02) * num3;
-        return q;
-    }
-
-    float num5 = sqrt(((1.0 + m22) - m00) - m11);
-    float num2 = 0.5 / num5;
-    q.x = (m20 + m02) * num2;
-    q.y = (m21 + m12) * num2;
-    q.z = 0.5 * num5;
-    q.w = (m01 - m10) * num2;
-    return q;
-}
-
-float4x4 GetTRS(float3 pos, float4 q, float3 s)
-{
-    float4x4 result = float4x4( 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0);
-    // Rotation and Scale
-    // Quaternion multiplication can be used to represent rotation. 
-    // If a quaternion is represented by qw + i qx + j qy + k qz , then the equivalent matrix for rotation is (including scale):
-    // Remarks: https://forums.inovaestudios.com/t/math-combining-a-translation-rotation-and-scale-matrix-question-to-you-math-magicians/5194/2
-    float sqw = q.w * q.w;
-    float sqx = q.x * q.x;
-    float sqy = q.y * q.y;
-    float sqz = q.z * q.z;
-    result[0][0] = (1 - 2 * sqy - 2 * sqz) * s.x;
-    result[0][1] = (2 * q.x * q.y - 2 * q.z * q.w);
-    result[0][2] = (2 * q.x * q.z + 2 * q.y * q.w);
-    result[1][0] = (2 * q.x * q.y + 2 * q.z * q.w);
-    result[1][1] = (1 - 2 * sqx - 2 * sqz) * s.y;
-    result[1][2] = (2 * q.y * q.z - 2 * q.x * q.w);
-    result[2][0] = (2 * q.x * q.z - 2 * q.y * q.w);
-    result[2][1] = (2 * q.y * q.z + 2 * q.x * q.w);
-    result[2][2] = (1 - 2 * sqx - 2 * sqy) * s.z;
-    // Translation
-    result[0][3] = pos.x;
-    result[1][3] = pos.y;
-    result[2][3] = pos.z;
-    result[3][3] = 1.0f;
-    // Return result
-    return result;
-}
 
 StructuredBuffer<float3> _positionBuffer;
 StructuredBuffer<PBDSkeletonInfo> _skeletonDataBuffer; 
@@ -141,17 +41,17 @@ void Skeleton (uint3 id : SV_DispatchThreadID)
     float3 neck = _positionBuffer[_skeletonDataBuffer[id.x].neckIndex];
     float3 p = hips;
     float4 q = qmul(q_look_at(neck - hips, float3(0,1,0)), q_look_at(float3(-1,0,0), float3(0,1,0)));
-    _skeletonBoneTransformBuffer[id.x * BONES_AMOUNT + _rootBoneIndex].Trs = GetTRS(p,q, float3(1,1,1));
+    _skeletonBoneTransformBuffer[id.x * BONES_AMOUNT + _rootBoneIndex].Trs = compose(p,q, float3(1,1,1));
     
     for (int i = 0; i < _bonesAmount; i++)
     {
-        float4x4 m = _skeletonBoneTransformBuffer[id.x * BONES_AMOUNT + i].Trs;
+        float4x4 boneLocalToWorld = _skeletonBoneTransformBuffer[id.x * BONES_AMOUNT + i].Trs;
         int parentIndex = _skeletonBoneTransformBuffer[id.x * BONES_AMOUNT + i].ParentIndex;
         while (parentIndex != -1)
         {
-            m = mul(_skeletonBoneTransformBuffer[id.x * BONES_AMOUNT + parentIndex].Trs, m);
+            boneLocalToWorld = mul(_skeletonBoneTransformBuffer[id.x * BONES_AMOUNT + parentIndex].Trs, boneLocalToWorld);
             parentIndex = _skeletonBoneTransformBuffer[id.x * BONES_AMOUNT + parentIndex].ParentIndex;
         }
-        _boneMatrices[id.x * BONES_AMOUNT + i] = mul(m, _bindPosesBuffer[i]);
+        _boneMatrices[id.x * BONES_AMOUNT + i] = mul(boneLocalToWorld, _bindPosesBuffer[i]);
     }   
 }
