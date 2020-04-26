@@ -18,7 +18,7 @@ namespace PBD
 
         private const int CONNECTION_AMOUNT = 32; // how many connections may have each point
         private const int SOLVER_STEPS = 3;
-        private readonly Bounds _bounds = new Bounds(Vector3.zero, Vector3.one * 100f);
+        private readonly Bounds _bounds = new Bounds(Vector3.zero, Vector3.one * 100);
 
         // Object settings
         private readonly float _pointCollisionStiffness; // when 2 points collide
@@ -215,6 +215,7 @@ namespace PBD
             _skeletonShader.SetBuffer(_skeletonKernel, "_boneMatrices", _boneMatricesBuffer);
             _skeletonShader.SetBuffer(_skeletonKernel, "_bindPosesBuffer", _bindPosesBuffer);
             _skeletonShader.SetInt("_bonesAmount", _modelData.BindPoses.Length);
+            _skeletonShader.SetInt("_rootBoneIndex", _modelData.RootBoneIndex);
 
 
             Shader.SetGlobalBuffer(Shader.PropertyToID("_positionBuffer"), _positionBuffer); // for debug

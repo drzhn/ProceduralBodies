@@ -130,24 +130,23 @@ RWStructuredBuffer<int> _neighboursUnitBuffer; // тут мы будем хра�
 RWStructuredBuffer<int> _neighboursBuffer; // тут мы будем хранить ближайшего соседа каждой точки (исключая ближайшую из юнита)
 
 int _bonesAmount;
+int _rootBoneIndex;
 
 [numthreads(UNITS_AMOUNT,1,1)]
 void Skeleton (uint3 id : SV_DispatchThreadID)
 {
     if (!_skeletonDataBuffer[id.x].valid) return;
+    
+    float3 hips = _positionBuffer[_skeletonDataBuffer[id.x].hipsIndex];
+    float3 neck = _positionBuffer[_skeletonDataBuffer[id.x].neckIndex];
+    float3 p = hips;
+    float4 q = qmul(q_look_at(neck - hips, float3(0,1,0)), q_look_at(float3(-1,0,0), float3(0,1,0)));
+    _skeletonBoneTransformBuffer[id.x * BONES_AMOUNT + _rootBoneIndex].Trs = GetTRS(p,q, float3(1,1,1));
+    
     for (int i = 0; i < _bonesAmount; i++)
     {
         float4x4 m = _skeletonBoneTransformBuffer[id.x * BONES_AMOUNT + i].Trs;
         int parentIndex = _skeletonBoneTransformBuffer[id.x * BONES_AMOUNT + i].ParentIndex;
-        if (parentIndex == -1)
-        {
-            float3 hips = _positionBuffer[_skeletonDataBuffer[id.x].hipsIndex];
-            float3 neck = _positionBuffer[_skeletonDataBuffer[id.x].neckIndex];
-            float3 p = hips;
-            float4 q = qmul(q_look_at(neck - hips, float3(0,1,0)), q_look_at(float3(-1,0,0), float3(0,1,0)));
-            _skeletonBoneTransformBuffer[id.x * BONES_AMOUNT + i].Trs = GetTRS(p,q, float3(1,1,1));
-            m = _skeletonBoneTransformBuffer[id.x * BONES_AMOUNT + i].Trs;
-        }
         while (parentIndex != -1)
         {
             m = mul(_skeletonBoneTransformBuffer[id.x * BONES_AMOUNT + parentIndex].Trs, m);

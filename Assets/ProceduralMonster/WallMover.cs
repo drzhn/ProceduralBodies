@@ -1,10 +1,12 @@
 ﻿using System;
+using Unity.Mathematics;
 using UnityEngine;
 
 [RequireComponent(typeof(Rigidbody))]
 [RequireComponent(typeof(CapsuleCollider))]
 public class WallMover : MonoBehaviour
 {
+    public Transform Camera;
     public float Speed = 8.0f; // Speed when walking forward
 
     // distance for checking if the controller is grounded ( 0.01f seems to work best for this )
@@ -35,6 +37,20 @@ public class WallMover : MonoBehaviour
         isMoving = false;
         isSlowing = false;
         isWalking = true;
+
+        angle = 0;
+    }
+
+    private float _angle = 0;
+    private float angle
+    {
+        get => _angle;
+        set
+        {
+            _angle = value;
+            Camera.position = transform.position + Quaternion.AngleAxis(_angle,transform.up) * transform.TransformDirection( new Vector3(0, 10, -9));
+            Camera.rotation = Quaternion.LookRotation(transform.position - Camera.position, transform.up);
+        }
     }
 
     private void Update()
@@ -78,7 +94,9 @@ public class WallMover : MonoBehaviour
             Vector2 input = GetInput();
             if ((Mathf.Abs(input.x) > float.Epsilon || Mathf.Abs(input.y) > float.Epsilon) && (m_IsGrounded))
             {
-                walkingDirection = transform.forward * input.y + transform.right * input.x;
+                var forward = Vector3.ProjectOnPlane(transform.position - Camera.position, groundContactNormal);
+                var right = Vector3.Cross(forward, groundContactNormal);
+                walkingDirection = forward * input.y + -right * input.x;
                 walkingDirection = Vector3.ProjectOnPlane(walkingDirection, groundContactNormal).normalized;
 
                 walkingDirection = walkingDirection * Speed;
@@ -98,12 +116,13 @@ public class WallMover : MonoBehaviour
 
     private Vector2 GetInput()
     {
-        Vector2 input = new Vector2
-        {
-            x = 0,
-            y = 1
-        };
-        return input;
+        // Vector2 input = new Vector2
+        // {
+        //     x = 0,
+        //     y = 1
+        // };
+        angle += Input.GetAxis("Mouse X");
+        return new Vector2(Input.GetAxis("Horizontal"), Input.GetAxis("Vertical"));
     }
 
     private void GroundCheck()
