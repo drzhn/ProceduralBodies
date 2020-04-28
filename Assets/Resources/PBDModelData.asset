@@ -14,10 +14,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   Prefab: {fileID: 300441094620709514, guid: 5652d8de11bb5784fad52d962f0d3f53, type: 3}
   Mesh: {fileID: 4300000, guid: 85d938798cd2f1443a0a3fc3a0729f02, type: 3}
-  LeftHand: {x: 0, y: 0, z: 0}
-  RightHand: {x: 0, y: 0, z: 0}
-  LeftFoot: {x: 0, y: 0, z: 0}
-  RightFoot: {x: 0, y: 0, z: 0}
+  SkeletonData:
+    leftHand: {x: 32, y: 33, z: 34}
+    rightHand: {x: 1, y: 3, z: 5}
+    leftFoot: {x: 31, y: 54, z: 55}
+    rightFoot: {x: 23, y: 51, z: 52}
   BindPoses:
   - e00: 1
     e01: 3.6379788e-10

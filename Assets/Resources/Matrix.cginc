@@ -3,6 +3,10 @@
 
 #define IDENTITY_MATRIX float4x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1)
 
+#ifndef FLT_EPSILON
+#define FLT_EPSILON     1.192092896e-07 
+#endif 
+
 float4x4 inverse(float4x4 m) {
     float n11 = m[0][0], n12 = m[1][0], n13 = m[2][0], n14 = m[3][0];
     float n21 = m[0][1], n22 = m[1][1], n23 = m[2][1], n24 = m[3][1];
@@ -15,7 +19,7 @@ float4x4 inverse(float4x4 m) {
     float t14 = n14 * n23 * n32 - n13 * n24 * n32 - n14 * n22 * n33 + n12 * n24 * n33 + n13 * n22 * n34 - n12 * n23 * n34;
 
     float det = n11 * t11 + n21 * t12 + n31 * t13 + n41 * t14;
-    float idet = 1.0f / det;
+    float idet = 1.0f / (det+ FLT_EPSILON);
 
     float4x4 ret;
 
@@ -132,12 +136,60 @@ float4x4 m_translate(float4x4 m, float3 v)
     return m;
 }
 
+float4x4 m_translate_4(float4x4 m, float4 v)
+{
+    m[0][3] = v.x;
+    m[1][3] = v.y;
+    m[2][3] = v.z;
+    m[3][3] = v.w;
+    return m;
+}
+
 float4x4 compose(float3 position, float4 quat, float3 scale)
 {
     float4x4 m = quaternion2matrix(quat);
     m = m_scale(m, scale);
     m = m_translate(m, position);
     return m;
+}
+
+float4x4 compose_4(float4 position, float4x4 rot, float3 scale)
+{
+    rot = m_scale(rot, scale);
+    rot = m_translate_4(rot, position);
+    return rot;
+}
+
+float3 extract_position(float4x4 m)
+{
+    return float3(
+        m[0][3], 
+        m[1][3], 
+        m[2][3]);
+}
+
+float4 extract_position_4(float4x4 m)
+{
+    return float4(
+        m[0][3], 
+        m[1][3], 
+        m[2][3],
+        m[3][3]);
+}
+
+float3 extract_scale(float4x4 m)
+{
+    float sx = length(float3(m[0][0], m[0][1], m[0][2]));
+    float sy = length(float3(m[1][0], m[1][1], m[1][2]));
+    float sz = length(float3(m[2][0], m[2][1], m[2][2]));
+
+    // if determine is negative, we need to invert one scale
+    float det = determinant(m);
+    if (det < 0) {
+        sx = -sx;
+    }
+
+    return float3(sx,sy,sz);
 }
 
 void decompose(in float4x4 m, out float3 position, out float4 rotation, out float3 scale)
@@ -151,10 +203,7 @@ void decompose(in float4x4 m, out float3 position, out float4 rotation, out floa
     if (det < 0) {
         sx = -sx;
     }
-
-    position.x = m[3][0];
-    position.y = m[3][1];
-    position.z = m[3][2];
+    position = extract_position(m);
 
     // scale the rotation part
 
@@ -250,24 +299,5 @@ float4x4 extract_rotation_matrix(float4x4 m)
     return m;
 }
 
-float3 extract_position(float4x4 m)
-{
-    return float3(m[3][0], m[3][1], m[3][2]);
-}
-
-float3 extract_scale(float4x4 m)
-{
-    float sx = length(float3(m[0][0], m[0][1], m[0][2]));
-    float sy = length(float3(m[1][0], m[1][1], m[1][2]));
-    float sz = length(float3(m[2][0], m[2][1], m[2][2]));
-
-    // if determine is negative, we need to invert one scale
-    float det = determinant(m);
-    if (det < 0) {
-        sx = -sx;
-    }
-
-    return float3(sx,sy,sz);
-}
 
 #endif // __MATRIX_INCLUDED__

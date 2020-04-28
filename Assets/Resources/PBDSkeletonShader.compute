@@ -8,14 +8,14 @@
 
 #define ZERO float3(0,0,0)
 
-struct PBDUnitData
+struct PBDUnitData // 12 bytes
 {
     bool valid;
     int hipsIndex;
     int neckIndex;
 };
 
-struct PBDSkeletonData
+struct PBDSkeletonData // 48 bytes
 {
     int3 leftHand;
     int3 rightHand;
@@ -23,7 +23,7 @@ struct PBDSkeletonData
     int3 rightFoot;
 };
 
-struct PBDSkeletonBoneTransform
+struct PBDSkeletonBoneTransform // 68 bytes
 {
     float4x4 Trs;
     int ParentIndex;
@@ -43,21 +43,9 @@ RWStructuredBuffer<int> _neighboursBuffer; // тут мы будем храни�
 int _bonesAmount;
 int _rootBoneIndex;
 
-inline float4x4 getParentWorldToLocal(int offset, int index)
+inline float4x4 getLocalToWorld(int offset, int index)
 {
-    float4x4 parentLocalToWorld = IDENTITY_MATRIX;
-    int parentIndex = _skeletonBoneTransformBuffer[offset + index].ParentIndex;
-    while (parentIndex != -1)
-    {
-        parentLocalToWorld = mul(_skeletonBoneTransformBuffer[offset + parentIndex].Trs, parentLocalToWorld);
-        parentIndex = _skeletonBoneTransformBuffer[offset + parentIndex].ParentIndex;
-    }
-
-    return  inverse(parentLocalToWorld);
-}
-
-inline float3 getPosition(int offset, int index)
-{
+    if (index == -1) return IDENTITY_MATRIX;
     float4x4 boneLocalToWorld = _skeletonBoneTransformBuffer[offset + index].Trs;
     int parentIndex = _skeletonBoneTransformBuffer[offset + index].ParentIndex;
     while (parentIndex != -1)
@@ -65,37 +53,89 @@ inline float3 getPosition(int offset, int index)
         boneLocalToWorld = mul(_skeletonBoneTransformBuffer[offset + parentIndex].Trs, boneLocalToWorld);
         parentIndex = _skeletonBoneTransformBuffer[offset + parentIndex].ParentIndex;
     }
-    float3 position = float3(0,0,0);
-    
-    position.x = boneLocalToWorld[3][0];
-    position.y = boneLocalToWorld[3][1];
-    position.z = boneLocalToWorld[3][2];
-    
-    return position;
+    return boneLocalToWorld;
 }
 
-inline void setPosition(int offset, int index, float3 position)
+inline float4x4 getWorldToLocal(int offset, int index)
 {
-    float4x4 parentWorldToLocal = getParentWorldToLocal(offset, index);
-    _skeletonBoneTransformBuffer[offset + index].Trs = m_translate(_skeletonBoneTransformBuffer[offset + index].Trs, mul(parentWorldToLocal, float4(position,1)));
+    return inverse(getLocalToWorld(offset, index));
+}
+
+inline float4 getPosition(int offset, int index)
+{
+    return extract_position_4(getLocalToWorld(offset, index));
+}
+
+inline void setPosition(int offset, int index, float4 position)
+{
+    int parentIndex = _skeletonBoneTransformBuffer[offset + index].ParentIndex;
+    float4 localPosition = mul(getWorldToLocal(offset,parentIndex), position);
+    _skeletonBoneTransformBuffer[offset + index].Trs = m_translate_4(_skeletonBoneTransformBuffer[offset + index].Trs, localPosition);
+}
+
+inline float4x4 getRotationMat(int offset, int index)
+{
+    return extract_rotation_matrix(getLocalToWorld(offset, index));
+}
+
+inline float4 getRotation(int offset, int index)
+{
+    return matrix_to_quaternion(extract_rotation_matrix(getLocalToWorld(offset, index)));
+}
+
+inline void setRotationMat(int offset, int index, float4x4 rotation)
+{
+    int parentIndex = _skeletonBoneTransformBuffer[offset + index].ParentIndex;
+    float4x4 localRotation = mul(getWorldToLocal(offset,parentIndex), rotation);
+
+    float4 position = extract_position_4(_skeletonBoneTransformBuffer[offset + index].Trs);
+    float3 scale = float3(1,1,1);// extract_scale(_skeletonBoneTransformBuffer[offset + index].Trs);
+    _skeletonBoneTransformBuffer[offset + index].Trs = compose_4(position,localRotation,scale);
 }
 
 inline void setRotation(int offset, int index, float4 rotation)
 {
-    float4x4 parentWorldToLocal = getParentWorldToLocal(offset, index);
-    float4x4 localRotation = mul(parentWorldToLocal, quaternion_to_matrix(rotation));
-    float3 position = extract_position(_skeletonBoneTransformBuffer[offset + index].Trs);
-    float3 scale = float3(1,1,1);// extract_scale(_skeletonBoneTransformBuffer[offset + index].Trs);
-
-    float4x4 m = localRotation;
-    m = m_scale(m, scale);
-    m = m_translate(m, position);
-    _skeletonBoneTransformBuffer[offset + index].Trs = m;
+    setRotationMat(offset, index, quaternion_to_matrix(rotation));
 }
 
 void UpdateLimbIK(int offset, int3 limb, float3 target)
 {
+    //float3 pos1 = getPosition(offset, limb.x);
+    //float3 pos2 = getPosition(offset, limb.y);
+    //float3 pos3 = getPosition(offset, limb.z);
+    //float dist1 = distance(pos1, pos2);
+    //float dist2 = distance(pos2, pos3);
+    //
+    //float3 origin = pos1;
+    //
+    //for (int k = 0; k < 3; k++)
+    //{
+    //    pos3 = target;
+    //    pos2 = pos3 + normalize(pos2-pos3)* dist2;
+    //    pos1 = pos2 + normalize(pos1-pos2)* dist1;
+    //    
+    //    pos1 = origin;
+    //    pos2 = pos1 + normalize(pos2-pos1)*dist1;
+    //    pos3 = pos2 + normalize(pos3-pos2)*dist2;
+    //}
+    //setRotation(offset, limb.x, q_look_at_x(normalize(pos2-pos1), float3(-1,0,0)));
+    //setRotation(offset, limb.y, q_look_at_x(normalize(pos3-pos2), float3(-1,0,0)));
     
+    //float4 pos = getPosition(offset, limb.x);
+    //setPosition(offset, limb.x, pos);
+    
+    float4 rot = getRotation(offset, limb.x);
+    setRotation(offset, limb.x, rot);
+    
+    //setRotation(offset, limb.x, q_look_at_x(float3(0,0,-1), float3(0,1,0)));
+    //setRotation(offset, limb.y, q_look_at_x(float3(0,1,0), float3(0,0,-1)));
+    
+    //float3 position;
+    //float4 rotation;
+    //float3 scale;
+    //
+    //decompose(_skeletonBoneTransformBuffer[offset + limb.x].Trs, position, rotation, scale);
+    //_skeletonBoneTransformBuffer[offset + limb.x].Trs = compose(position, rotation, scale);
 }
 
 [numthreads(UNITS_AMOUNT,1,1)]
@@ -106,26 +146,21 @@ void Skeleton (uint3 id : SV_DispatchThreadID)
     int offset = id.x * BONES_AMOUNT;
 
     PBDSkeletonData data = _skeletonDataBuffer[0];
-    float3 zero = float3(0,0,0);
+    float3 zero = float3(-FLT_EPSILON,0,0);
     
     
     float3 hips = _positionBuffer[_unitDataBuffer[id.x].hipsIndex];
     float3 neck = _positionBuffer[_unitDataBuffer[id.x].neckIndex];
     float3 p = hips;
-    float4 q = qmul(q_look_at(neck - hips, -hips), q_look_at(float3(-1,0,0), float3(0,1,0))); // TODO исправить направление таза 
+    float4 q = q_look_at_x(neck - hips, zero -hips); // TODO исправить направление таза 
     
     _skeletonBoneTransformBuffer[offset + _rootBoneIndex].Trs = compose(p,q, float3(1,1,1));
-    
+   
+    UpdateLimbIK(offset, data.leftHand, zero);
     
     for (int i = 0; i < _bonesAmount; i++)
     {
-        float4x4 boneLocalToWorld = _skeletonBoneTransformBuffer[offset + i].Trs;
-        int parentIndex = _skeletonBoneTransformBuffer[offset + i].ParentIndex;
-        while (parentIndex != -1)
-        {
-            boneLocalToWorld = mul(_skeletonBoneTransformBuffer[offset + parentIndex].Trs, boneLocalToWorld);
-            parentIndex = _skeletonBoneTransformBuffer[offset + parentIndex].ParentIndex;
-        }
+        float4x4 boneLocalToWorld = getLocalToWorld(offset,i);
         _boneMatrices[offset + i] = mul(boneLocalToWorld, _bindPosesBuffer[i]);
     }   
 }

@@ -7,6 +7,10 @@
 #define PI 3.14159265359f
 #endif 
 
+#ifndef FLT_EPSILON
+#define FLT_EPSILON     1.192092896e-07 
+#endif 
+
 // Quaternion multiplication
 // http://mathworld.wolfram.com/Quaternion.html
 float4 qmul(float4 q1, float4 q2)
@@ -134,6 +138,11 @@ float4 q_look_at(float3 forward, float3 up)
     q.z = 0.5 * num5;
     q.w = (m01 - m10) * num2;
     return q;
+}
+
+float4 q_look_at_x(float3 forward, float3 up)
+{
+    return qmul(q_look_at(forward, up), q_look_at(float3(-1,0,0), float3(0,1,0)));
 }
 
 float4 q_slerp(in float4 a, in float4 b, float t)

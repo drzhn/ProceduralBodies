@@ -35,6 +35,7 @@ namespace PBD
                 Debug.LogError("Prefab is null");
                 return;
             }
+
             SkinnedMeshRenderer rend = obj.Prefab.GetComponentInChildren<SkinnedMeshRenderer>();
             var mesh = rend.sharedMesh;
             obj.Mesh = mesh;
@@ -67,6 +68,66 @@ namespace PBD
             }
 
             obj.SkeletonData = skeletonData;
+
+            int lefthand = 32;
+            Vector4 position = bones[lefthand].position;
+            LogVector4(position);
+            LogVector4(bones[lefthand].localPosition);
+
+            position = bones[lefthand].localToWorldMatrix * (new Vector4(0, 0, 0, 1));
+            LogVector4(position);
+            LogVector4(bones[lefthand].parent.worldToLocalMatrix * position);
+
+            Debug.Log(bones[lefthand].localToWorldMatrix);
+            Debug.Log(inverse(bones[lefthand].worldToLocalMatrix));
+            EditorUtility.SetDirty(obj);
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+
+            // l2w * v_l = v_w 
+        }
+
+        private void LogVector4(Vector4 v)
+        {
+            Debug.Log($"{v.x} {v.y} {v.z} {v.w}");
+        }
+
+        private Matrix4x4 inverse(Matrix4x4 m)
+        {
+            float n11 = m.m00, n12 = m.m10, n13 = m.m20, n14 = m.m30;
+            float n21 = m.m01, n22 = m.m11, n23 = m.m21, n24 = m.m31;
+            float n31 = m.m02, n32 = m.m12, n33 = m.m22, n34 = m.m32;
+            float n41 = m.m03, n42 = m.m13, n43 = m.m23, n44 = m.m33;
+
+            float t11 = n23 * n34 * n42 - n24 * n33 * n42 + n24 * n32 * n43 - n22 * n34 * n43 - n23 * n32 * n44 + n22 * n33 * n44;
+            float t12 = n14 * n33 * n42 - n13 * n34 * n42 - n14 * n32 * n43 + n12 * n34 * n43 + n13 * n32 * n44 - n12 * n33 * n44;
+            float t13 = n13 * n24 * n42 - n14 * n23 * n42 + n14 * n22 * n43 - n12 * n24 * n43 - n13 * n22 * n44 + n12 * n23 * n44;
+            float t14 = n14 * n23 * n32 - n13 * n24 * n32 - n14 * n22 * n33 + n12 * n24 * n33 + n13 * n22 * n34 - n12 * n23 * n34;
+
+            float det = n11 * t11 + n21 * t12 + n31 * t13 + n41 * t14;
+            Debug.Log($"DET: {det}");
+            float idet = 1.0f / det;
+
+            Matrix4x4 ret;
+
+            ret.m00 = t11 * idet;
+            ret.m01 = (n24 * n33 * n41 - n23 * n34 * n41 - n24 * n31 * n43 + n21 * n34 * n43 + n23 * n31 * n44 - n21 * n33 * n44) * idet;
+            ret.m02 = (n22 * n34 * n41 - n24 * n32 * n41 + n24 * n31 * n42 - n21 * n34 * n42 - n22 * n31 * n44 + n21 * n32 * n44) * idet;
+            ret.m03 = (n23 * n32 * n41 - n22 * n33 * n41 - n23 * n31 * n42 + n21 * n33 * n42 + n22 * n31 * n43 - n21 * n32 * n43) * idet;
+            ret.m10 = t12 * idet;
+            ret.m11 = (n13 * n34 * n41 - n14 * n33 * n41 + n14 * n31 * n43 - n11 * n34 * n43 - n13 * n31 * n44 + n11 * n33 * n44) * idet;
+            ret.m12 = (n14 * n32 * n41 - n12 * n34 * n41 - n14 * n31 * n42 + n11 * n34 * n42 + n12 * n31 * n44 - n11 * n32 * n44) * idet;
+            ret.m13 = (n12 * n33 * n41 - n13 * n32 * n41 + n13 * n31 * n42 - n11 * n33 * n42 - n12 * n31 * n43 + n11 * n32 * n43) * idet;
+            ret.m20 = t13 * idet;
+            ret.m21 = (n14 * n23 * n41 - n13 * n24 * n41 - n14 * n21 * n43 + n11 * n24 * n43 + n13 * n21 * n44 - n11 * n23 * n44) * idet;
+            ret.m22 = (n12 * n24 * n41 - n14 * n22 * n41 + n14 * n21 * n42 - n11 * n24 * n42 - n12 * n21 * n44 + n11 * n22 * n44) * idet;
+            ret.m23 = (n13 * n22 * n41 - n12 * n23 * n41 - n13 * n21 * n42 + n11 * n23 * n42 + n12 * n21 * n43 - n11 * n22 * n43) * idet;
+            ret.m30 = t14 * idet;
+            ret.m31 = (n13 * n24 * n31 - n14 * n23 * n31 + n14 * n21 * n33 - n11 * n24 * n33 - n13 * n21 * n34 + n11 * n23 * n34) * idet;
+            ret.m32 = (n14 * n22 * n31 - n12 * n24 * n31 - n14 * n21 * n32 + n11 * n24 * n32 + n12 * n21 * n34 - n11 * n22 * n34) * idet;
+            ret.m33 = (n12 * n23 * n31 - n13 * n22 * n31 + n13 * n21 * n32 - n11 * n23 * n32 - n12 * n21 * n33 + n11 * n22 * n33) * idet;
+
+            return ret;
         }
     }
 }
