@@ -38,9 +38,20 @@ namespace PBD
     public struct PBDSkeletonData // Data per skeleton type
     {
         public Vector3Int leftHand;
+        public int leftHandInverseX;
+        public Vector3 leftHandUp;
+
         public Vector3Int rightHand;
+        public int rightHandInverseX;
+        public Vector3 rightHandUp;
+    
         public Vector3Int leftFoot;
+        public int leftFootInverseX;
+        public Vector3 leftFootUp;
+        
         public Vector3Int rightFoot;
+        public int rightFootInverseX;
+        public Vector3 rightFootUp;
     }
 
     [Serializable]

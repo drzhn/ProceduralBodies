@@ -15,12 +15,23 @@ struct PBDUnitData // 12 bytes
     int neckIndex;
 };
 
-struct PBDSkeletonData // 48 bytes
+struct PBDSkeletonData // 112 bytes
 {
     int3 leftHand;
+    int leftHandInverseX;
+    float3 leftHandUp;
+    
     int3 rightHand;
+    int rightHandInverseX;
+    float3 rightHandUp;
+    
     int3 leftFoot;
+    int leftFootInverseX;
+    float3 leftFootUp;
+    
     int3 rightFoot;
+    int rightFootInverseX;
+    float3 rightFootUp;
 };
 
 struct PBDSkeletonBoneTransform // 68 bytes
@@ -98,44 +109,29 @@ inline void setRotation(int offset, int index, float4 rotation)
     setRotationMat(offset, index, quaternion_to_matrix(rotation));
 }
 
-void UpdateLimbIK(int offset, int3 limb, float3 target)
+void UpdateLimbIK(int offset, int3 limb, int invertX, float3 up, float3 target)
 {
-    //float3 pos1 = getPosition(offset, limb.x);
-    //float3 pos2 = getPosition(offset, limb.y);
-    //float3 pos3 = getPosition(offset, limb.z);
-    //float dist1 = distance(pos1, pos2);
-    //float dist2 = distance(pos2, pos3);
-    //
-    //float3 origin = pos1;
-    //
-    //for (int k = 0; k < 3; k++)
-    //{
-    //    pos3 = target;
-    //    pos2 = pos3 + normalize(pos2-pos3)* dist2;
-    //    pos1 = pos2 + normalize(pos1-pos2)* dist1;
-    //    
-    //    pos1 = origin;
-    //    pos2 = pos1 + normalize(pos2-pos1)*dist1;
-    //    pos3 = pos2 + normalize(pos3-pos2)*dist2;
-    //}
-    //setRotation(offset, limb.x, q_look_at_x(normalize(pos2-pos1), float3(-1,0,0)));
-    //setRotation(offset, limb.y, q_look_at_x(normalize(pos3-pos2), float3(-1,0,0)));
+    float3 pos1 = getPosition(offset, limb.x).xyz;
+    float3 pos2 = getPosition(offset, limb.y).xyz;
+    float3 pos3 = getPosition(offset, limb.z).xyz;
+    float dist1 = distance(pos1, pos2);
+    float dist2 = distance(pos2, pos3);
     
-    //float4 pos = getPosition(offset, limb.x);
-    //setPosition(offset, limb.x, pos);
+    float3 origin = pos1;
     
-    float4 rot = getRotation(offset, limb.x);
-    setRotation(offset, limb.x, rot);
-    
-    //setRotation(offset, limb.x, q_look_at_x(float3(0,0,-1), float3(0,1,0)));
-    //setRotation(offset, limb.y, q_look_at_x(float3(0,1,0), float3(0,0,-1)));
-    
-    //float3 position;
-    //float4 rotation;
-    //float3 scale;
-    //
-    //decompose(_skeletonBoneTransformBuffer[offset + limb.x].Trs, position, rotation, scale);
-    //_skeletonBoneTransformBuffer[offset + limb.x].Trs = compose(position, rotation, scale);
+    for (int k = 0; k < 3; k++)
+    {
+        pos3 = target;
+        pos2 = pos3 + normalize(pos2-pos3)* dist2;
+        pos1 = pos2 + normalize(pos1-pos2)* dist1;
+        
+        pos1 = origin;
+        pos2 = pos1 + normalize(pos2-pos1)*dist1;
+        pos3 = pos2 + normalize(pos3-pos2)*dist2;
+    }
+    int inv = 1;
+    setRotation(offset, limb.x, q_look_at_x(invertX * normalize(pos2-pos1), invertX * up));
+    setRotation(offset, limb.y, q_look_at_x(invertX * normalize(pos3-pos2), invertX * up));
 }
 
 [numthreads(UNITS_AMOUNT,1,1)]
@@ -156,7 +152,10 @@ void Skeleton (uint3 id : SV_DispatchThreadID)
     
     _skeletonBoneTransformBuffer[offset + _rootBoneIndex].Trs = compose(p,q, float3(1,1,1));
    
-    UpdateLimbIK(offset, data.leftHand, zero);
+    UpdateLimbIK(offset, data.leftHand, data.leftHandInverseX, mul(_skeletonBoneTransformBuffer[offset + _rootBoneIndex].Trs, float4(data.leftHandUp,0)).xyz, zero);
+    UpdateLimbIK(offset, data.rightHand, data.rightHandInverseX, mul(_skeletonBoneTransformBuffer[offset + _rootBoneIndex].Trs, float4(data.rightHandUp,0)).xyz, zero);
+    UpdateLimbIK(offset, data.leftFoot, data.leftFootInverseX, mul(_skeletonBoneTransformBuffer[offset + _rootBoneIndex].Trs, float4(data.leftFootUp,0)).xyz, zero);
+    UpdateLimbIK(offset, data.rightFoot, data.rightFootInverseX, mul(_skeletonBoneTransformBuffer[offset + _rootBoneIndex].Trs, float4(data.rightFootUp,0)).xyz, zero);
     
     for (int i = 0; i < _bonesAmount; i++)
     {

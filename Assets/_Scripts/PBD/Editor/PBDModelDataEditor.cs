@@ -67,6 +67,17 @@ namespace PBD
                 skeletonData.rightFoot[i] = Array.IndexOf(bones, boneContainer.RightFoot[i]);
             }
 
+            skeletonData.leftHandInverseX = Vector3.Dot(boneContainer.LeftHand[0].right.normalized, boneContainer.LeftHand[1].position - boneContainer.LeftHand[0].position) < 0 ? 1 : -1;
+            skeletonData.rightHandInverseX = Vector3.Dot(boneContainer.RightHand[0].right.normalized, boneContainer.RightHand[1].position - boneContainer.RightHand[0].position) < 0 ? 1 : -1;
+            skeletonData.leftFootInverseX = Vector3.Dot(boneContainer.LeftFoot[0].right.normalized, boneContainer.LeftFoot[1].position - boneContainer.LeftFoot[0].position) < 0 ? 1 : -1;
+            skeletonData.rightFootInverseX = Vector3.Dot(boneContainer.RightFoot[0].right.normalized, boneContainer.RightFoot[1].position - boneContainer.RightFoot[0].position) < 0 ? 1 : -1;
+
+            skeletonData.leftHandUp = boneContainer.LeftHand[0].up;
+            skeletonData.rightHandUp = boneContainer.RightHand[0].up;
+            skeletonData.leftFootUp = boneContainer.LeftFoot[0].up;
+            skeletonData.rightFootUp = boneContainer.RightFoot[0].up;
+            
+            
             obj.SkeletonData = skeletonData;
 
             int lefthand = 32;
