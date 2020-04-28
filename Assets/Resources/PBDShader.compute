@@ -1,25 +1,8 @@
 ﻿#pragma kernel PBD
+
+#include "PBDStructs.cginc"
+
 #define POINT_AMOUNT 1024
-
-struct PBDPointInfo
-{
-     bool valid;
-     float mass;
-     float radius;
-};
-
-struct PBDConnectionInfo
-{
-    int pointIndex;
-    float stiffness;
-    float distance;
-};
-
-struct PBDBoneInfo
-{
-    float3 position;
-    int parentIndex;
-};
 
 inline float3 ClosestPointOnSegment(float3 p, float3 a, float3 b)
 {
@@ -37,6 +20,8 @@ RWStructuredBuffer<float3> _tempPositionBuffer;
 RWStructuredBuffer<PBDConnectionInfo> _connectionDataBuffer;
 
 RWStructuredBuffer<PBDBoneInfo> _bonesDataBuffer;
+
+StructuredBuffer<int> _neighboursBuffer;
 
 
 int _connectionAmount;

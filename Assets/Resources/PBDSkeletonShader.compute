@@ -1,5 +1,6 @@
 ﻿#pragma kernel Skeleton
 
+#include "PBDStructs.cginc"
 #include "Quaternion.cginc"
 #include "Matrix.cginc"
 
@@ -7,38 +8,6 @@
 #define BONES_AMOUNT 100
 
 #define ZERO float3(0,0,0)
-
-struct PBDUnitData // 12 bytes
-{
-    bool valid;
-    int hipsIndex;
-    int neckIndex;
-};
-
-struct PBDSkeletonData // 112 bytes
-{
-    int3 leftHand;
-    int leftHandInverseX;
-    float3 leftHandUp;
-    
-    int3 rightHand;
-    int rightHandInverseX;
-    float3 rightHandUp;
-    
-    int3 leftFoot;
-    int leftFootInverseX;
-    float3 leftFootUp;
-    
-    int3 rightFoot;
-    int rightFootInverseX;
-    float3 rightFootUp;
-};
-
-struct PBDSkeletonBoneTransform // 68 bytes
-{
-    float4x4 Trs;
-    int ParentIndex;
-};
 
 StructuredBuffer<float3> _positionBuffer;
 StructuredBuffer<PBDUnitData> _unitDataBuffer; 
