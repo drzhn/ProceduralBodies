@@ -18,7 +18,6 @@ StructuredBuffer<float4x4> _bindPosesBuffer;
 RWStructuredBuffer<float4x4> _boneMatrices;
 
 RWStructuredBuffer<int> _neighboursUnitBuffer; // тут мы будем хранить вторую часть юнита каждой точки. L = POINT_AMOUNT
-RWStructuredBuffer<int> _neighboursBuffer; // тут мы будем хранить ближайшего соседа каждой точки (исключая ближайшую из юнита)
 
 int _bonesAmount;
 int _rootBoneIndex;

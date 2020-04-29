@@ -22,7 +22,7 @@ RWStructuredBuffer<PBDConnectionInfo> _connectionDataBuffer;
 RWStructuredBuffer<PBDBoneInfo> _bonesDataBuffer;
 
 StructuredBuffer<int> _neighboursBuffer;
-
+RWStructuredBuffer<PBDUnitData> _unitDataBuffer; 
 
 int _connectionAmount;
 int _bonesAmount;

@@ -61,6 +61,8 @@ namespace PBD
         private readonly ComputeBuffer _bindPosesBuffer;
         private readonly ComputeBuffer _argsBuffer;
 
+        private readonly ComputeBuffer _neighboursBuffer;
+
 
         // spherecast batching data
         private NativeArray<SpherecastCommand> _sphereCastCommands; // for batching spherecast
@@ -75,6 +77,9 @@ namespace PBD
         private PBDModelData _modelData;
         private Material _instancedMaterial;
 
+        private readonly Camera _camera;
+        private readonly CommandBuffer _commandBuffer = new CommandBuffer();
+
         public PBDObject(
             float pointCollisionStiffness,
             float boneStiffness,
@@ -82,7 +87,8 @@ namespace PBD
             bool useGravity,
             Transform rootBone,
             PBDModelData modelData,
-            Material instancedMaterial
+            Material instancedMaterial,
+            Camera camera
         )
         {
             // Instanced material initialization
@@ -167,7 +173,7 @@ namespace PBD
             _sphereCastHits = new NativeArray<RaycastHit>(POINTS_AMOUNT, Allocator.Persistent);
 
             _unitData = new NativeArray<PBDUnitData>(POINTS_AMOUNT / 2, Allocator.Persistent);
-
+            var neighboursData = new NativeArray<int>(POINTS_AMOUNT, Allocator.TempJob);
 
             for (int i = 0; i < POINTS_AMOUNT; i++)
             {
@@ -184,6 +190,8 @@ namespace PBD
                     _connectionData[i * CONNECTION_AMOUNT + j] = c;
                 }
 
+                neighboursData[i] = -1;
+
                 if (i % 2 == 0)
                 {
                     _unitData[i / 2] = new PBDUnitData()
@@ -191,6 +199,10 @@ namespace PBD
                         valid = false,
                         hipsIndex = -1,
                         neckIndex = -1,
+                        hipsNeighbour1 = -1,
+                        hipsNeighbour2 = -1,
+                        neckNeighbour1 = -1,
+                        neckNeighbour2 = -1,
                     };
                 }
             }
@@ -210,6 +222,7 @@ namespace PBD
             _connectionDataBuffer = new ComputeBuffer(POINTS_AMOUNT * CONNECTION_AMOUNT, Marshal.SizeOf<PBDConnectionInfo>());
             _bonesDataBuffer = new ComputeBuffer(_rootBone.childCount + 1, Marshal.SizeOf<PBDBoneInfo>());
             _unitDataBuffer = new ComputeBuffer(POINTS_AMOUNT / 2, Marshal.SizeOf<PBDUnitData>());
+            _neighboursBuffer = new ComputeBuffer(POINTS_AMOUNT, sizeof(int));
 
             _pbdShader.SetBuffer(_pbdKernel, "_pointsDataBuffer", _pointsDataBuffer);
             _pbdShader.SetBuffer(_pbdKernel, "_positionBuffer", _positionBuffer);
@@ -217,6 +230,7 @@ namespace PBD
             _pbdShader.SetBuffer(_pbdKernel, "_tempPositionBuffer", _tempPositionBuffer);
             _pbdShader.SetBuffer(_pbdKernel, "_connectionDataBuffer", _connectionDataBuffer);
             _pbdShader.SetBuffer(_pbdKernel, "_bonesDataBuffer", _bonesDataBuffer);
+            _pbdShader.SetBuffer(_pbdKernel, "_neighboursBuffer", _neighboursBuffer);
 
             _skeletonShader.SetBuffer(_skeletonKernel, "_positionBuffer", _positionBuffer);
             _skeletonShader.SetBuffer(_skeletonKernel, "_unitDataBuffer", _unitDataBuffer);
@@ -240,6 +254,29 @@ namespace PBD
 
             _pointsDataBuffer.SetData(_pointsData);
             _unitDataBuffer.SetData(_unitData);
+            _neighboursBuffer.SetData(neighboursData);
+
+            neighboursData.Dispose();
+
+
+            _commandBuffer.DispatchCompute(_skeletonShader, _skeletonKernel, 1, 1, 1);
+            _commandBuffer.DrawMeshInstancedIndirect(_modelData.Mesh,
+                0,
+                _instancedMaterial,
+                0,
+                _argsBuffer);
+
+            _camera = camera;
+            if (_camera.renderingPath != RenderingPath.Forward)
+            {
+                Dispose();
+                throw new Exception("PBD only works with forward rendering");
+            }
+
+            _camera.AddCommandBuffer(CameraEvent.AfterForwardOpaque, _commandBuffer);
+#if UNITY_EDITOR
+            UnityEditor.SceneView.lastActiveSceneView.camera.AddCommandBuffer(CameraEvent.AfterForwardOpaque, _commandBuffer);
+#endif
         }
 
         public void SetNewProperty(Type type, string name, object value) // не судите строго, если эта штука будет не для дебага, перепишу на норм
@@ -283,6 +320,8 @@ namespace PBD
                 neckIndex = index2
             };
             _unitDataBuffer.SetData(_unitData, skeletonIndex, skeletonIndex, 1);
+            _neighboursBuffer.SetData(new[] {index2}, 0, index1, 1);
+            _neighboursBuffer.SetData(new[] {index1}, 0, index2, 1);
         }
 
         public void AddPoint(Vector3 position, float radius, float mass, out int index)
@@ -415,15 +454,15 @@ namespace PBD
 
         public void OnGraphicsUpdate()
         {
-            _skeletonShader.Dispatch(_skeletonKernel, 1, 1, 1);
-
-            Graphics.DrawMeshInstancedIndirect(
-                _modelData.Mesh,
-                0,
-                _instancedMaterial,
-                _bounds,
-                _argsBuffer
-            );
+            // _skeletonShader.Dispatch(_skeletonKernel, 1, 1, 1);
+            // Graphics.DrawMeshInstancedIndirect(
+            //     _modelData.Mesh,
+            //     0,
+            //     _instancedMaterial,
+            //     _bounds,
+            //     _argsBuffer
+            // );
+            // Graphics.ExecuteCommandBuffer(_commandBuffer);
         }
 
         private int FindUnusedPointIndex()
@@ -496,6 +535,12 @@ namespace PBD
             _skeletonBoneTransformBuffer.Dispose();
             _bindPosesBuffer.Dispose();
             _argsBuffer.Dispose();
+            _neighboursBuffer.Dispose();
+
+            _commandBuffer.Dispose();
+#if UNITY_EDITOR
+            UnityEditor.SceneView.lastActiveSceneView.camera.RemoveAllCommandBuffers();
+#endif
         }
     }
 }

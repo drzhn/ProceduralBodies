@@ -65,8 +65,7 @@
             float boneWeight2 = _VertexWeights[vertexId*4+2];
             float boneWeight3 = _VertexWeights[vertexId*4+3];
             
-            float4 vec = v.vertex;
-            vec =
+            float4 vec =
                 mul(_BonesMatrices[instanceId * BONES_AMOUNT + boneIndex0],v.vertex) * boneWeight0 +
                 mul(_BonesMatrices[instanceId * BONES_AMOUNT + boneIndex1],v.vertex) * boneWeight1 +
                 mul(_BonesMatrices[instanceId * BONES_AMOUNT + boneIndex2],v.vertex) * boneWeight2 +
@@ -74,8 +73,7 @@
             
             v.vertex = mul(unity_WorldToObject, vec);
             
-            float4 nor = float4(v.normal, 1);
-            nor =
+            float4 nor =
                 mul(_BonesMatrices[instanceId * BONES_AMOUNT + boneIndex0],v.normal) * boneWeight0 +
                 mul(_BonesMatrices[instanceId * BONES_AMOUNT + boneIndex1],v.normal) * boneWeight1 +
                 mul(_BonesMatrices[instanceId * BONES_AMOUNT + boneIndex2],v.normal) * boneWeight2 +

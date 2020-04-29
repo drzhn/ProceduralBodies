@@ -6,6 +6,7 @@ using UnityEngine;
 
 public class PBDCreatorTest : MonoBehaviour
 {
+    [SerializeField] private Camera _camera;
     [SerializeField] private PBDModelData _modelData;
     [SerializeField] private Material _instancedMaterial;
     [SerializeField] [Space] private Transform _rootBone;
@@ -55,7 +56,7 @@ public class PBDCreatorTest : MonoBehaviour
 ////            _pbd.AddConnection(_points[connection.transform], _points[connection.connectedPoint], _stiffness);
 //        }
 
-        _pbd = new PBDObject(_collisionStiffness, _boneStiffness, _damping, _useGravity, _rootBone, _modelData, _instancedMaterial);
+        _pbd = new PBDObject(_collisionStiffness, _boneStiffness, _damping, _useGravity, _rootBone, _modelData, _instancedMaterial, _camera);
 
         // for (int x = 0; x < _amountPerDimension; x++)
         // {
@@ -76,7 +77,7 @@ public class PBDCreatorTest : MonoBehaviour
 
     private readonly Bounds _drawingBounds = new Bounds(Vector3.zero, new Vector3(100.0f, 100.0f, 100.0f));
 
-    // private int _unitsAmound = 0;
+    private int _unitsAmount = 0;
     private void Update()
     {
         _pbd.OnGraphicsUpdate();
@@ -96,10 +97,10 @@ public class PBDCreatorTest : MonoBehaviour
                 _argsBuffer);
         }
 
-        // if (_unitsAmound < 500)
+        // if (_unitsAmount < 500)
         // {
         //     AddUnit();
-        //     _unitsAmound++;
+        //     _unitsAmount++;
         // }
     }
 
