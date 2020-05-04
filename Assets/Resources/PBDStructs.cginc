@@ -26,11 +26,6 @@ struct PBDUnitData // 28 bytes
     bool valid;
     int hipsIndex;
     int neckIndex;
-    
-    int hipsNeighbour1;
-    int hipsNeighbour2;
-    int neckNeighbour1;
-    int neckNeighbour2;
 };
 
 struct PBDSkeletonData // 112 bytes

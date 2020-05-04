@@ -32,11 +32,6 @@ namespace PBD
         public bool valid;
         public int hipsIndex;
         public int neckIndex;
-
-        public int hipsNeighbour1;
-        public int hipsNeighbour2;
-        public int neckNeighbour1;
-        public int neckNeighbour2;
     }
 
     [Serializable]

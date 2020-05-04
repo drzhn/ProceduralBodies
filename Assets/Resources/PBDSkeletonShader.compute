@@ -17,7 +17,7 @@ StructuredBuffer<float4x4> _bindPosesBuffer;
 
 RWStructuredBuffer<float4x4> _boneMatrices;
 
-RWStructuredBuffer<int> _neighboursUnitBuffer; // тут мы будем хранить вторую часть юнита каждой точки. L = POINT_AMOUNT
+StructuredBuffer<int> _neighboursBuffer;
 
 int _bonesAmount;
 int _rootBoneIndex;
@@ -112,18 +112,27 @@ void Skeleton (uint3 id : SV_DispatchThreadID)
     PBDSkeletonData data = _skeletonDataBuffer[0];
     float3 zero = float3(-FLT_EPSILON,0,0);
     
+    int targetIndex1 = _neighboursBuffer[_unitDataBuffer[id.x].neckIndex * 2 + 0];
+    int targetIndex2 = _neighboursBuffer[_unitDataBuffer[id.x].neckIndex * 2 + 1];
+    int targetIndex3 = _neighboursBuffer[_unitDataBuffer[id.x].hipsIndex * 2 + 0];
+    int targetIndex4 = _neighboursBuffer[_unitDataBuffer[id.x].hipsIndex * 2 + 1];
+    
+    float3 target1 = _positionBuffer[targetIndex1];
+    float3 target2 = _positionBuffer[targetIndex2];
+    float3 target3 = _positionBuffer[targetIndex3];
+    float3 target4 = _positionBuffer[targetIndex4];
     
     float3 hips = _positionBuffer[_unitDataBuffer[id.x].hipsIndex];
     float3 neck = _positionBuffer[_unitDataBuffer[id.x].neckIndex];
     float3 p = hips;
-    float4 q = q_look_at_x(neck - hips, zero -hips); // TODO исправить направление таза 
+    float4 q = q_look_at_x(neck - hips, (target1 + target2 + target3 + target4)/4.0 - hips); // TODO исправить направление таза 
     
     _skeletonBoneTransformBuffer[offset + _rootBoneIndex].Trs = compose(p,q, float3(1,1,1));
-   
-    UpdateLimbIK(offset, data.leftHand, data.leftHandInverseX, mul(_skeletonBoneTransformBuffer[offset + _rootBoneIndex].Trs, float4(data.leftHandUp,0)).xyz, zero);
-    UpdateLimbIK(offset, data.rightHand, data.rightHandInverseX, mul(_skeletonBoneTransformBuffer[offset + _rootBoneIndex].Trs, float4(data.rightHandUp,0)).xyz, zero);
-    UpdateLimbIK(offset, data.leftFoot, data.leftFootInverseX, mul(_skeletonBoneTransformBuffer[offset + _rootBoneIndex].Trs, float4(data.leftFootUp,0)).xyz, zero);
-    UpdateLimbIK(offset, data.rightFoot, data.rightFootInverseX, mul(_skeletonBoneTransformBuffer[offset + _rootBoneIndex].Trs, float4(data.rightFootUp,0)).xyz, zero);
+    
+    if (targetIndex1 != -1) UpdateLimbIK(offset, data.leftHand, data.leftHandInverseX, mul(_skeletonBoneTransformBuffer[offset + _rootBoneIndex].Trs, float4(data.leftHandUp,0)).xyz, target1);
+    if (targetIndex2 != -1) UpdateLimbIK(offset, data.rightHand, data.rightHandInverseX, mul(_skeletonBoneTransformBuffer[offset + _rootBoneIndex].Trs, float4(data.rightHandUp,0)).xyz, target2);
+    if (targetIndex3 != -1) UpdateLimbIK(offset, data.leftFoot, data.leftFootInverseX, mul(_skeletonBoneTransformBuffer[offset + _rootBoneIndex].Trs, float4(data.leftFootUp,0)).xyz, target3);
+    if (targetIndex4 != -1) UpdateLimbIK(offset, data.rightFoot, data.rightFootInverseX, mul(_skeletonBoneTransformBuffer[offset + _rootBoneIndex].Trs, float4(data.rightFootUp,0)).xyz, target4);
     
     for (int i = 0; i < _bonesAmount; i++)
     {

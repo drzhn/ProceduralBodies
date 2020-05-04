@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using PBD;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 public class PBDCreatorTest : MonoBehaviour
 {
@@ -22,6 +23,7 @@ public class PBDCreatorTest : MonoBehaviour
     private bool _debugPoints;
 
     [SerializeField] private Material _debugInstancedMaterial;
+    [SerializeField] private bool _debugAdd500Units;
 
 
     private PBDConnectionTest[] _connections;
@@ -78,6 +80,7 @@ public class PBDCreatorTest : MonoBehaviour
     private readonly Bounds _drawingBounds = new Bounds(Vector3.zero, new Vector3(100.0f, 100.0f, 100.0f));
 
     private int _unitsAmount = 0;
+
     private void Update()
     {
         _pbd.OnGraphicsUpdate();
@@ -97,11 +100,11 @@ public class PBDCreatorTest : MonoBehaviour
                 _argsBuffer);
         }
 
-        // if (_unitsAmount < 500)
-        // {
-        //     AddUnit();
-        //     _unitsAmount++;
-        // }
+        if (_unitsAmount < 500 && _debugAdd500Units)
+        {
+            AddUnit();
+            _unitsAmount++;
+        }
     }
 
     void FixedUpdate()
@@ -109,12 +112,37 @@ public class PBDCreatorTest : MonoBehaviour
         _pbd.OnPhysicsUpdate(Time.fixedDeltaTime);
     }
 
+    private int _shaderPass = 0;
+    private CameraEvent _event;
+    private CameraEvent[] _events = (CameraEvent[]) Enum.GetValues(typeof(CameraEvent));
+
     private void OnGUI()
     {
         if (GUI.Button(new Rect(0, 30, 100, 30), "Add new unit"))
         {
             AddUnit();
         }
+
+        // GUI.Label(new Rect(0, 60, 400, 30),$"ShaderPass: {_shaderPass}, CameraEvent: {_event.ToString()}");
+        // int shaderPass = Mathf.RoundToInt(GUI.HorizontalSlider(new Rect(0, 90, 100, 30), _shaderPass, -1, 4));
+        // if (shaderPass != _shaderPass)
+        // {
+        //     _pbd.UpdateCameraCommandBuffer(_shaderPass, _event);
+        // }
+        //
+        // int offset = 120;
+        // foreach (CameraEvent evt in _events)
+        // {
+        //     if (GUI.Button(new Rect(0, offset, 200, 25), evt.ToString()))
+        //     {
+        //         _event = evt;
+        //         _pbd.UpdateCameraCommandBuffer(_shaderPass, _event);
+        //     }
+        //
+        //     offset += 25;
+        // }
+        //
+        // _shaderPass = shaderPass;
     }
 
     private void AddUnit()
@@ -122,7 +150,7 @@ public class PBDCreatorTest : MonoBehaviour
         _pbd.AddUnit(
             new Vector3(0, 0, 0),
             _radius,
-            new Vector3(0, 1, 0),
+            new Vector3(0, 0.52f, 0),
             _radius,
             _stiffness
         );
@@ -133,14 +161,14 @@ public class PBDCreatorTest : MonoBehaviour
         _debugMesh = new Mesh();
         List<Vector3> positions = new List<Vector3>();
 
-        positions.Add(new Vector3(-0.5f, 0, 0));
-        positions.Add(new Vector3(+0.5f, 0, 0));
+        positions.Add(new Vector3(-_radius, 0, 0));
+        positions.Add(new Vector3(+_radius, 0, 0));
 
-        positions.Add(new Vector3(0, -0.5f, 0));
-        positions.Add(new Vector3(0, +0.5f, 0));
+        positions.Add(new Vector3(0, -_radius, 0));
+        positions.Add(new Vector3(0, +_radius, 0));
 
-        positions.Add(new Vector3(0, 0, -0.5f));
-        positions.Add(new Vector3(0, 0, +0.5f));
+        positions.Add(new Vector3(0, 0, -_radius));
+        positions.Add(new Vector3(0, 0, +_radius));
 
         List<int> indices = new List<int>();
         for (int i = 0; i < positions.Count; i += 2)

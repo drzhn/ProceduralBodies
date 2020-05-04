@@ -21,8 +21,8 @@ RWStructuredBuffer<PBDConnectionInfo> _connectionDataBuffer;
 
 RWStructuredBuffer<PBDBoneInfo> _bonesDataBuffer;
 
-StructuredBuffer<int> _neighboursBuffer;
-RWStructuredBuffer<PBDUnitData> _unitDataBuffer; 
+StructuredBuffer<int> _unitNeighboursBuffer; // intdex->unitNeighbour. length = POINT_AMOUNT * 2
+RWStructuredBuffer<int> _neighboursBuffer; // intdex->neighbour (excluding unit neighbour). length = POINT_AMOUNT * 2
 
 int _connectionAmount;
 int _bonesAmount;
@@ -38,22 +38,24 @@ float _boneStiffness;
 [numthreads(POINT_AMOUNT,1,1)]
 void PBD (uint3 id : SV_DispatchThreadID)
 {
-    if (_pointsDataBuffer[id.x].valid)
+    uint index = id.x;
+    
+    if (_pointsDataBuffer[index].valid)
     {
-        _velocityBuffer[id.x] = float3(0,0,0);
+        _velocityBuffer[index] = float3(0,0,0);
         if (_prevDeltaTime > 0) // обрабатываем инфу с предыдущего кадра
         { 
-            _velocityBuffer[id.x] = (_tempPositionBuffer[id.x] - _positionBuffer[id.x]) / _prevDeltaTime;
+            _velocityBuffer[index] = (_tempPositionBuffer[index] - _positionBuffer[index]) / _prevDeltaTime;
         }
-        _positionBuffer[id.x] = _tempPositionBuffer[id.x];
+        _positionBuffer[index] = _tempPositionBuffer[index];
         
         
         if (_useGravity) 
         {
-            _velocityBuffer[id.x] += _pointsDataBuffer[id.x].mass * 9.8 * _deltaTime * float3(0, -1, 0);
+            _velocityBuffer[index] += _pointsDataBuffer[index].mass * 9.8 * _deltaTime * float3(0, -1, 0);
         }
-        _velocityBuffer[id.x] *= _velocityDamping;
-        _tempPositionBuffer[id.x] = _positionBuffer[id.x] + _deltaTime * _velocityBuffer[id.x];
+        _velocityBuffer[index] *= _velocityDamping;
+        _tempPositionBuffer[index] = _positionBuffer[index] + _deltaTime * _velocityBuffer[index];
         
         GroupMemoryBarrierWithGroupSync();
         
@@ -64,49 +66,89 @@ void PBD (uint3 id : SV_DispatchThreadID)
             // Connections
             for (int i = 0; i < _connectionAmount; i++)
             {
-                int connectedPointIndex = _connectionDataBuffer[id.x * _connectionAmount + i].pointIndex;
+                int connectedPointIndex = _connectionDataBuffer[index * _connectionAmount + i].pointIndex;
                 if (connectedPointIndex != -1)
                 {
-                    float currentDistance = length(_tempPositionBuffer[connectedPointIndex] - _tempPositionBuffer[id.x]);
-                    float initialDistance = _connectionDataBuffer[id.x * _connectionAmount + i].distance;
-                    if (currentDistance > _pointsDataBuffer[id.x].radius + _pointsDataBuffer[i].radius)
+                    float currentDistance = length(_tempPositionBuffer[connectedPointIndex] - _tempPositionBuffer[index]);
+                    float initialDistance = _connectionDataBuffer[index * _connectionAmount + i].distance;
+                    if (currentDistance > _pointsDataBuffer[index].radius + _pointsDataBuffer[i].radius)
                     {
-                        float stretchingStiffness   = _connectionDataBuffer[id.x * _connectionAmount + i].stiffness;
+                        float stretchingStiffness   = _connectionDataBuffer[index * _connectionAmount + i].stiffness;
                         float3 dir = (currentDistance - initialDistance) / currentDistance *
-                                      (_tempPositionBuffer[id.x] - _tempPositionBuffer[connectedPointIndex]);
-                        float k = _pointsDataBuffer[id.x].mass / (_pointsDataBuffer[id.x].mass + _pointsDataBuffer[connectedPointIndex].mass);
-                        _tempPositionBuffer[id.x] -= k * stretchingStiffness * dir;
+                                      (_tempPositionBuffer[index] - _tempPositionBuffer[connectedPointIndex]);
+                        float k = _pointsDataBuffer[index].mass / (_pointsDataBuffer[index].mass + _pointsDataBuffer[connectedPointIndex].mass);
+                        _tempPositionBuffer[index] -= k * stretchingStiffness * dir;
                     }
                 }
             }
             // Collisions with other points
+            
+            int min1 = _neighboursBuffer[index*2+0];
+            int min2 = _neighboursBuffer[index*2+1];
+            int neighbour = _unitNeighboursBuffer[index];
+            
             for (uint j = 0; j < POINT_AMOUNT; j ++)
             {
-                if (_pointsDataBuffer[j].valid && j != id.x)
+                if (_pointsDataBuffer[j].valid && j != index)
                 {
-                    float currentDistance = length(_tempPositionBuffer[j] - _tempPositionBuffer[id.x]);
-                    float desiredDistance = _pointsDataBuffer[id.x].radius + _pointsDataBuffer[j].radius;
+                    float currentDistance = length(_tempPositionBuffer[j] - _tempPositionBuffer[index]);
+                    float desiredDistance = _pointsDataBuffer[index].radius + _pointsDataBuffer[j].radius;
                     if (currentDistance < desiredDistance)
                     {
-                        float3 dir = (currentDistance - desiredDistance) / currentDistance * (_tempPositionBuffer[id.x] - _tempPositionBuffer[j]);
-                        float k = _pointsDataBuffer[id.x].mass / (_pointsDataBuffer[id.x].mass + _pointsDataBuffer[j].mass);
-                        _tempPositionBuffer[id.x] -= k * _collisionStiffness * dir;
+                        float3 dir = (currentDistance - desiredDistance) / currentDistance * (_tempPositionBuffer[index] - _tempPositionBuffer[j]);
+                        float k = _pointsDataBuffer[index].mass / (_pointsDataBuffer[index].mass + _pointsDataBuffer[j].mass);
+                        _tempPositionBuffer[index] -= k * _collisionStiffness * dir;
+                    }
+                    
+                    if ((int)j != neighbour)
+                    {
+                        if (min1 == -1)
+                        {
+                            min1 = j;
+                        }
+                        else
+                        {
+                            if (min2 == -1)
+                            {
+                                min2 = j;
+                            }
+                            else
+                            {
+                                float candidateDistance = distance(_tempPositionBuffer[index], _tempPositionBuffer[j]);
+                                float oldDistance = distance(_tempPositionBuffer[index], _tempPositionBuffer[min1]);
+                                if (candidateDistance < oldDistance && oldDistance > 0.7 && candidateDistance < 0.6)
+                                {
+                                    min1 = j;
+                                }
+                                else
+                                {
+                                    oldDistance = distance(_tempPositionBuffer[index], _tempPositionBuffer[min2]);
+                                    if (candidateDistance < oldDistance && oldDistance > 0.7 && candidateDistance < 0.6)
+                                    {
+                                        min2 = j;
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
+            
+            _neighboursBuffer[index*2+0] = min1;
+            _neighboursBuffer[index*2+1] = min2;
             
             // Bones calculations
             float3 closestPoint = _bonesDataBuffer[0].position;
             for (int k = 1; k < _bonesAmount; k ++)
             {
-                float3 p = ClosestPointOnSegment(_tempPositionBuffer[id.x], _bonesDataBuffer[k].position, _bonesDataBuffer[_bonesDataBuffer[k].parentIndex].position);
-                if (length(p - _tempPositionBuffer[id.x]) < length(closestPoint - _tempPositionBuffer[id.x]))
+                float3 p = ClosestPointOnSegment(_tempPositionBuffer[index], _bonesDataBuffer[k].position, _bonesDataBuffer[_bonesDataBuffer[k].parentIndex].position);
+                if (length(p - _tempPositionBuffer[index]) < length(closestPoint - _tempPositionBuffer[index]))
                 {
                     closestPoint = p;
                 }
             }
-            float3 dir = _tempPositionBuffer[id.x] - closestPoint;
-            _tempPositionBuffer[id.x] -= _boneStiffness * dir;
+            float3 dir = _tempPositionBuffer[index] - closestPoint;
+            _tempPositionBuffer[index] -= _boneStiffness * dir;
             
             
             GroupMemoryBarrierWithGroupSync();

@@ -9,13 +9,13 @@
     }
     SubShader
     {
-        Tags { "RenderType"="Opaque" }
+        Tags { "RenderType"="Opaque"  "Queue" = "Geometry"}
         LOD 200
 
         CGPROGRAM
         #define BONES_AMOUNT 100
 
-        #pragma surface surf Standard fullforwardshadows addshadow vertex:vert
+        #pragma surface surf Standard fullforwardshadows addshadow vertex:vert exclude_path:deferred
         #pragma target 5.0
         #pragma only_renderers d3d11
 
