@@ -44,11 +44,11 @@ namespace PBD
         public Vector3Int rightHand;
         public int rightHandInverseX;
         public Vector3 rightHandUp;
-    
+
         public Vector3Int leftFoot;
         public int leftFootInverseX;
         public Vector3 leftFootUp;
-        
+
         public Vector3Int rightFoot;
         public int rightFootInverseX;
         public Vector3 rightFootUp;
@@ -60,6 +60,13 @@ namespace PBD
         public Matrix4x4 Trs;
         public int ParentIndex;
     }
+
+    public struct PBDRaycastHitData
+    {
+        public bool valid;
+        public Vector3 position;
+        public Vector3 normal;
+    };
 
 
     public struct PrepareBonesPositionCommands : IJobParallelForTransform
@@ -76,6 +83,7 @@ namespace PBD
 
     public struct PrepareSpherecastCommands : IJobParallelFor
     {
+        [ReadOnly] public float radius; 
         public NativeArray<SpherecastCommand> Spherecasts;
         [ReadOnly] public NativeArray<PBDPointInfo> pointsData;
 
@@ -92,7 +100,7 @@ namespace PBD
 
             Spherecasts[i] = new SpherecastCommand(
                 oldPositions[i],
-                pointsData[i].radius,
+                radius,
                 (newPositions[i] - oldPositions[i]).normalized,
                 Vector3.Distance(newPositions[i], oldPositions[i]) + 0.003f);
         }
@@ -100,6 +108,7 @@ namespace PBD
 
     public struct IntegrateCollision : IJobParallelFor
     {
+        [ReadOnly] public float radius; 
         [ReadOnly] public NativeArray<RaycastHit> Hits;
         [ReadOnly] public NativeArray<PBDPointInfo> pointsData;
 
@@ -109,19 +118,27 @@ namespace PBD
         [NativeDisableContainerSafetyRestriction]
         public NativeArray<Vector3> newPositions;
 
+        [NativeDisableContainerSafetyRestriction]
+        public NativeArray<PBDRaycastHitData> raycastHits;
+
         public void Execute(int i)
         {
             if (!pointsData[i].valid) return;
 
-            if (Hits[i].normal == Vector3.zero) return;
+            if (Hits[i].normal == Vector3.zero)
+            {
+                raycastHits[i] = new PBDRaycastHitData() {valid = false, normal = Vector3.zero, position = Vector3.zero};
+                return;
+            }
 
             Vector3 oldPoint = oldPositions[i];
             Vector3 newPoint = newPositions[i];
-            Vector3 realCollisionPoint = Hits[i].point + Hits[i].normal * (pointsData[i].radius + 0.003f);
+            Vector3 realCollisionPoint = Hits[i].point + Hits[i].normal * (radius + 0.003f);
             oldPositions[i] = realCollisionPoint + (oldPoint - newPoint).normalized * (0.003f);
             newPositions[i] = realCollisionPoint +
                               Vector3.ProjectOnPlane(newPoint - realCollisionPoint, Hits[i].normal) +
                               Hits[i].normal * (0.003f);
+            raycastHits[i] = new PBDRaycastHitData() {valid = true, normal = Hits[i].normal, position = Hits[i].point};
         }
     }
 }

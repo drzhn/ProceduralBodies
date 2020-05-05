@@ -25,6 +25,8 @@ namespace PBD
         private readonly float _boneStiffness;
         private readonly float _velocityDamping;
         private readonly bool _useGravity;
+        private readonly float _distanceFromGround;
+
 
 
         // Object data
@@ -62,12 +64,16 @@ namespace PBD
         private readonly ComputeBuffer _argsBuffer;
 
         private readonly ComputeBuffer _unitNeighboursBuffer;
-        private readonly ComputeBuffer _neighboursBuffer;
+        private readonly ComputeBuffer _nearestIkTargetPositionBuffer;
+        private readonly ComputeBuffer _raycastHitsBuffer;
+        private readonly ComputeBuffer _pointNeighboursBuffer;
+        private readonly ComputeBuffer _isGroundedBuffer;
 
 
         // spherecast batching data
         private NativeArray<SpherecastCommand> _sphereCastCommands; // for batching spherecast
-        private NativeArray<RaycastHit> _sphereCastHits; // for results
+        private NativeArray<RaycastHit> _sphereCastHits; // for results // TODO make real world colliders collision compute in CS shader
+        private NativeArray<PBDRaycastHitData> _raycastHitsData; // for sending result to GPU
 
         // connection to bones data
         private readonly Transform _rootBone;
@@ -86,6 +92,7 @@ namespace PBD
             float boneStiffness,
             float velocityDamping,
             bool useGravity,
+            float distanceFromGround,
             Transform rootBone,
             PBDModelData modelData,
             Material instancedMaterial,
@@ -162,6 +169,7 @@ namespace PBD
             _pointCollisionStiffness = pointCollisionStiffness;
             _velocityDamping = velocityDamping;
             _useGravity = useGravity;
+            _distanceFromGround = distanceFromGround;
 
             _pointsData = new NativeArray<PBDPointInfo>(POINTS_AMOUNT, Allocator.Persistent);
             _position = new NativeArray<Vector3>(POINTS_AMOUNT, Allocator.Persistent);
@@ -172,10 +180,13 @@ namespace PBD
 
             _sphereCastCommands = new NativeArray<SpherecastCommand>(POINTS_AMOUNT, Allocator.Persistent);
             _sphereCastHits = new NativeArray<RaycastHit>(POINTS_AMOUNT, Allocator.Persistent);
+            _raycastHitsData = new NativeArray<PBDRaycastHitData>(POINTS_AMOUNT, Allocator.Persistent);
 
             _unitData = new NativeArray<PBDUnitData>(POINTS_AMOUNT / 2, Allocator.Persistent);
             var unitNeighboursData = new NativeArray<int>(POINTS_AMOUNT, Allocator.TempJob);
-            var neighboursData = new NativeArray<int>(POINTS_AMOUNT * 2, Allocator.TempJob);
+            var nearestIkTargetPositionData = new NativeArray<Vector3>(POINTS_AMOUNT * 2, Allocator.TempJob);
+            var pointNeighboursData = new NativeArray<int>(POINTS_AMOUNT * 2, Allocator.TempJob);
+            var isGroundedData = new NativeArray<int>(POINTS_AMOUNT, Allocator.TempJob);
 
             for (int i = 0; i < POINTS_AMOUNT; i++)
             {
@@ -193,8 +204,11 @@ namespace PBD
                 }
 
                 unitNeighboursData[i] = -1;
-                neighboursData[i * 2 + 0] = -1;
-                neighboursData[i * 2 + 1] = -1;
+                nearestIkTargetPositionData[i * 2 + 0] = Vector3.one;
+                nearestIkTargetPositionData[i * 2 + 1] = Vector3.one;
+                pointNeighboursData[i * 2 + 0] = -1;
+                pointNeighboursData[i * 2 + 1] = -1;
+                isGroundedData[i] = 0;
 
                 if (i % 2 == 0)
                 {
@@ -205,6 +219,8 @@ namespace PBD
                         neckIndex = -1,
                     };
                 }
+
+                _raycastHitsData[i] = new PBDRaycastHitData() {valid = false, normal = Vector3.zero, position = Vector3.zero};
             }
 
             _pbdShader = (ComputeShader) Resources.Load("PBDShader");
@@ -223,7 +239,10 @@ namespace PBD
             _bonesDataBuffer = new ComputeBuffer(_rootBone.childCount + 1, Marshal.SizeOf<PBDBoneInfo>());
             _unitDataBuffer = new ComputeBuffer(POINTS_AMOUNT / 2, Marshal.SizeOf<PBDUnitData>());
             _unitNeighboursBuffer = new ComputeBuffer(POINTS_AMOUNT, sizeof(int));
-            _neighboursBuffer = new ComputeBuffer(POINTS_AMOUNT * 2, sizeof(int));
+            _nearestIkTargetPositionBuffer = new ComputeBuffer(POINTS_AMOUNT * 2, Marshal.SizeOf<Vector3>());
+            _raycastHitsBuffer = new ComputeBuffer(POINTS_AMOUNT, Marshal.SizeOf<PBDRaycastHitData>());
+            _pointNeighboursBuffer = new ComputeBuffer(POINTS_AMOUNT * 2, sizeof(int));
+            _isGroundedBuffer = new ComputeBuffer(POINTS_AMOUNT, sizeof(int));
 
             _pbdShader.SetBuffer(_pbdKernel, "_pointsDataBuffer", _pointsDataBuffer);
             _pbdShader.SetBuffer(_pbdKernel, "_positionBuffer", _positionBuffer);
@@ -232,7 +251,10 @@ namespace PBD
             _pbdShader.SetBuffer(_pbdKernel, "_connectionDataBuffer", _connectionDataBuffer);
             _pbdShader.SetBuffer(_pbdKernel, "_bonesDataBuffer", _bonesDataBuffer);
             _pbdShader.SetBuffer(_pbdKernel, "_unitNeighboursBuffer", _unitNeighboursBuffer);
-            _pbdShader.SetBuffer(_pbdKernel, "_neighboursBuffer", _neighboursBuffer);
+            _pbdShader.SetBuffer(_pbdKernel, "_nearestIkTargetPositionBuffer", _nearestIkTargetPositionBuffer);
+            _pbdShader.SetBuffer(_pbdKernel, "_raycastHitsBuffer", _raycastHitsBuffer);
+            _pbdShader.SetBuffer(_pbdKernel, "_pointNeighboursBuffer", _pointNeighboursBuffer);
+            _pbdShader.SetBuffer(_pbdKernel, "_isGroundedBuffer", _isGroundedBuffer);
 
             _skeletonShader.SetBuffer(_skeletonKernel, "_positionBuffer", _positionBuffer);
             _skeletonShader.SetBuffer(_skeletonKernel, "_unitDataBuffer", _unitDataBuffer);
@@ -240,7 +262,7 @@ namespace PBD
             _skeletonShader.SetBuffer(_skeletonKernel, "_skeletonDataBuffer", _skeletonDataBuffer);
             _skeletonShader.SetBuffer(_skeletonKernel, "_boneMatrices", _boneMatricesBuffer);
             _skeletonShader.SetBuffer(_skeletonKernel, "_bindPosesBuffer", _bindPosesBuffer);
-            _skeletonShader.SetBuffer(_skeletonKernel, "_neighboursBuffer", _neighboursBuffer);
+            _skeletonShader.SetBuffer(_skeletonKernel, "_nearestIkTargetPositionBuffer", _nearestIkTargetPositionBuffer);
             _skeletonShader.SetInt("_bonesAmount", _modelData.BindPoses.Length);
             _skeletonShader.SetInt("_rootBoneIndex", _modelData.RootBoneIndex);
 
@@ -258,10 +280,15 @@ namespace PBD
             _pointsDataBuffer.SetData(_pointsData);
             _unitDataBuffer.SetData(_unitData);
             _unitNeighboursBuffer.SetData(unitNeighboursData);
-            _neighboursBuffer.SetData(neighboursData);
-            
+            _nearestIkTargetPositionBuffer.SetData(nearestIkTargetPositionData);
+            _raycastHitsBuffer.SetData(_raycastHitsData);
+            _pointNeighboursBuffer.SetData(pointNeighboursData);
+            _isGroundedBuffer.SetData(isGroundedData);
+
             unitNeighboursData.Dispose();
-            neighboursData.Dispose();
+            nearestIkTargetPositionData.Dispose();
+            pointNeighboursData.Dispose();
+            isGroundedData.Dispose();
 
             _commandBuffer.DispatchCompute(_skeletonShader, _skeletonKernel, 1, 1, 1);
             _commandBuffer.DrawMeshInstancedIndirect(_modelData.Mesh,
@@ -447,6 +474,7 @@ namespace PBD
             var sphereCastHits = new NativeArray<RaycastHit>(_pointsData.Length, Allocator.TempJob);
             var setupSpherecastCommands = new PrepareSpherecastCommands()
             {
+                radius = _distanceFromGround,
                 Spherecasts = sphereCastCommands,
                 pointsData = _pointsData,
                 oldPositions = _position,
@@ -463,10 +491,12 @@ namespace PBD
 
             var integrateJob = new IntegrateCollision()
             {
+                radius = _distanceFromGround,
                 pointsData = _pointsData,
                 Hits = sphereCastHits,
                 oldPositions = _position,
-                newPositions = _tempPosition
+                newPositions = _tempPosition,
+                raycastHits = _raycastHitsData
             };
 
             var integrateDependency = integrateJob.Schedule(_pointsData.Length, 32, _lastHandle);
@@ -475,6 +505,7 @@ namespace PBD
 
             _positionBuffer.SetData(_position);
             _tempPositionBuffer.SetData(_tempPosition);
+            _raycastHitsBuffer.SetData(_raycastHitsData);
 
             sphereCastCommands.Dispose();
             sphereCastHits.Dispose();
@@ -541,7 +572,7 @@ namespace PBD
             _connectionData.Dispose();
             _sphereCastCommands.Dispose();
             _sphereCastHits.Dispose();
-
+            _raycastHitsData.Dispose();
 
             _pointsDataBuffer.Dispose();
             _positionBuffer.Dispose();
@@ -564,8 +595,11 @@ namespace PBD
             _bindPosesBuffer.Dispose();
             _argsBuffer.Dispose();
             _unitNeighboursBuffer.Dispose();
-            _neighboursBuffer.Dispose();
-            
+            _nearestIkTargetPositionBuffer.Dispose();
+            _raycastHitsBuffer.Dispose();
+            _pointNeighboursBuffer.Dispose();
+            _isGroundedBuffer.Dispose();
+
             _commandBuffer.Dispose();
 #if UNITY_EDITOR
             var editorCam = UnityEditor.SceneView.lastActiveSceneView;

@@ -13,16 +13,21 @@ inline float3 ClosestPointOnSegment(float3 p, float3 a, float3 b)
     return a + d * v;
 }
 
+// WARNING: you can only define 8 RWStructuredBuffer (UAV)!
+
 RWStructuredBuffer<PBDPointInfo> _pointsDataBuffer;
 RWStructuredBuffer<float3> _positionBuffer;
 RWStructuredBuffer<float3> _velocityBuffer;
 RWStructuredBuffer<float3> _tempPositionBuffer;
 RWStructuredBuffer<PBDConnectionInfo> _connectionDataBuffer;
 
-RWStructuredBuffer<PBDBoneInfo> _bonesDataBuffer;
+StructuredBuffer<PBDBoneInfo> _bonesDataBuffer;
 
 StructuredBuffer<int> _unitNeighboursBuffer; // intdex->unitNeighbour. length = POINT_AMOUNT * 2
-RWStructuredBuffer<int> _neighboursBuffer; // intdex->neighbour (excluding unit neighbour). length = POINT_AMOUNT * 2
+RWStructuredBuffer<int> _pointNeighboursBuffer; // intdex->neighbour (excluding unit neighbour). length = POINT_AMOUNT * 2
+RWStructuredBuffer<float3> _nearestIkTargetPositionBuffer; // two ik target for every point (for pair of hands or legs). length = POINT_AMOUNT * 2
+StructuredBuffer<PBDRaycastHitData> _raycastHitsBuffer; // is point colliding now with real world in this frame? (and take position and normal if yes)
+RWStructuredBuffer<int> _isGroundedBuffer; // is point ik target on ground now? 0 - false, 1 - true. (stride of compute buffer can only be divided by 4)
 
 int _connectionAmount;
 int _bonesAmount;
@@ -83,9 +88,21 @@ void PBD (uint3 id : SV_DispatchThreadID)
             }
             // Collisions with other points
             
-            int min1 = _neighboursBuffer[index*2+0];
-            int min2 = _neighboursBuffer[index*2+1];
+            int min1 = _pointNeighboursBuffer[index * 2 + 0];
+            int min2 = _pointNeighboursBuffer[index * 2 + 1];
             int neighbour = _unitNeighboursBuffer[index];
+            
+            if (_isGroundedBuffer[index] == 1 && distance(_tempPositionBuffer[index], _nearestIkTargetPositionBuffer[index*2+0]) > 0.8)
+            {
+                _isGroundedBuffer[index] = 0;
+            }
+            
+            if (_raycastHitsBuffer[index].valid && _isGroundedBuffer[index] == 0)
+            {
+                _isGroundedBuffer[index] = 1;
+                _nearestIkTargetPositionBuffer[index*2+0] = _raycastHitsBuffer[index].position;
+                _nearestIkTargetPositionBuffer[index*2+1] = _raycastHitsBuffer[index].position;
+            }
             
             for (uint j = 0; j < POINT_AMOUNT; j ++)
             {
@@ -134,8 +151,21 @@ void PBD (uint3 id : SV_DispatchThreadID)
                 }
             }
             
-            _neighboursBuffer[index*2+0] = min1;
-            _neighboursBuffer[index*2+1] = min2;
+            _pointNeighboursBuffer[index * 2 + 0] = min1;
+            _pointNeighboursBuffer[index * 2 + 1] = min2;
+            
+            if (min1 != -1 && _isGroundedBuffer[index] == 0) _nearestIkTargetPositionBuffer[index*2+0] = _tempPositionBuffer[_pointNeighboursBuffer[index * 2 + 0]];
+            if (min2 != -1 && _isGroundedBuffer[index] == 0) _nearestIkTargetPositionBuffer[index*2+1] = _tempPositionBuffer[_pointNeighboursBuffer[index * 2 + 1]];
+            
+            //if (min1 != -1 && raycasted == false && distance(_tempPositionBuffer[index], _nearestIkTargetPositionBuffer[index*2+0]) > 0.7)
+            //{
+            //    _nearestIkTargetPositionBuffer[index*2+0] = _tempPositionBuffer[min1];
+            //}
+            //
+            //if (min2 != -1 && raycasted == false && distance(_tempPositionBuffer[index], _nearestIkTargetPositionBuffer[index*2+0]) > 0.7)
+            //{
+            //    _nearestIkTargetPositionBuffer[index*2+1] = _tempPositionBuffer[min2];
+            //}
             
             // Bones calculations
             float3 closestPoint = _bonesDataBuffer[0].position;

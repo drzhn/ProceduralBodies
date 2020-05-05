@@ -13,6 +13,7 @@ public class PBDCreatorTest : MonoBehaviour
     [SerializeField] [Space] private Transform _rootBone;
     [SerializeField] private int _amountPerDimension;
     [SerializeField] [Range(0, 1)] private float _radius;
+    [SerializeField] [Range(0, 1)] private float _distanceFromGround;
     [SerializeField] [Range(0, 1)] private float _stiffness;
     [SerializeField] [Range(0, 1)] private float _collisionStiffness;
     [SerializeField] [Range(0, 1)] private float _boneStiffness;
@@ -58,7 +59,7 @@ public class PBDCreatorTest : MonoBehaviour
 ////            _pbd.AddConnection(_points[connection.transform], _points[connection.connectedPoint], _stiffness);
 //        }
 
-        _pbd = new PBDObject(_collisionStiffness, _boneStiffness, _damping, _useGravity, _rootBone, _modelData, _instancedMaterial, _camera);
+        _pbd = new PBDObject(_collisionStiffness, _boneStiffness, _damping, _useGravity, _distanceFromGround, _rootBone, _modelData, _instancedMaterial, _camera);
 
         // for (int x = 0; x < _amountPerDimension; x++)
         // {
@@ -148,9 +149,9 @@ public class PBDCreatorTest : MonoBehaviour
     private void AddUnit()
     {
         _pbd.AddUnit(
-            new Vector3(0, 0, 0),
+            new Vector3(0, 1 + 0, 0),
             _radius,
-            new Vector3(0, 0.52f, 0),
+            new Vector3(0, 1 + 0.52f, 0),
             _radius,
             _stiffness
         );

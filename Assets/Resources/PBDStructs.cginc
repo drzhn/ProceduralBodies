@@ -28,6 +28,13 @@ struct PBDUnitData // 28 bytes
     int neckIndex;
 };
 
+struct PBDRaycastHitData
+{
+    bool valid;
+    float3 position;
+    float3 normal;
+};
+
 struct PBDSkeletonData // 112 bytes
 {
     int3 leftHand;
