@@ -3,9 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Unity.Collections;
-using Unity.Jobs;
 using UnityEngine;
-using UnityEngine.Jobs;
 
 public class RaycastAllTest : MonoBehaviour
 {
@@ -20,9 +18,9 @@ public class RaycastAllTest : MonoBehaviour
 //    }
     void Start()
     {
-        NativeArray<int> numbers = new NativeArray<int>(10,Allocator.Persistent);
-        NativeMultiHashMap<int, NativeList<Vector3>> pairs = new NativeMultiHashMap<int, NativeList<Vector3>>(30,Allocator.Persistent);
-        
+        // NativeArray<int> numbers = new NativeArray<int>(10,Allocator.Persistent);
+        // NativeMultiHashMap<int, NativeList<Vector3>> pairs = new NativeMultiHashMap<int, NativeList<Vector3>>(30,Allocator.Persistent);
+        //
 
     }
 

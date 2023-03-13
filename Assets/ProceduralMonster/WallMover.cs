@@ -1,5 +1,4 @@
 ﻿using System;
-using Unity.Mathematics;
 using UnityEngine;
 
 [RequireComponent(typeof(Rigidbody))]
@@ -7,6 +6,7 @@ using UnityEngine;
 public class WallMover : MonoBehaviour
 {
     public Transform Camera;
+    public float CameraDistance = 10f;
     public float Speed = 8.0f; // Speed when walking forward
 
     // distance for checking if the controller is grounded ( 0.01f seems to work best for this )
@@ -38,25 +38,27 @@ public class WallMover : MonoBehaviour
         isSlowing = false;
         isWalking = true;
 
-        angle = 0;
+        _cameraYRotation = 0;
+        _cameraXRotation = 0;
     }
 
-    private float _angle = 0;
-    private float angle
+    private float _cameraYRotation = 0;
+    private float _cameraXRotation = 0;
+    private Vector3 _cameraDirection = Vector3.one;
+
+    private void UpdateCameraRotation()
     {
-        get => _angle;
-        set
-        {
-            _angle = value;
-            Camera.position = transform.position + Quaternion.AngleAxis(_angle,transform.up) * transform.TransformDirection( new Vector3(0, 10, -9));
-            Camera.rotation = Quaternion.LookRotation(transform.position - Camera.position, transform.up);
-        }
+        Camera.position = transform.position + Quaternion.AngleAxis(_cameraYRotation, transform.up) * transform.TransformDirection(
+            new Vector3(
+            0, 
+            CameraDistance * Mathf.Sin(_cameraXRotation), 
+            CameraDistance * Mathf.Cos(_cameraXRotation)));
+        Camera.rotation = Quaternion.LookRotation(transform.position - Camera.position, transform.up);
     }
 
     private void Update()
     {
-        //isSlowing -> isMoving -> isWalking
-
+//isSlowing -> isMoving -> isWalking
         if (isMoving)
         {
             RotateCharacterToNormal();
@@ -86,7 +88,6 @@ public class WallMover : MonoBehaviour
         }
 
         if (isSlowing) return;
-
         if (isWalking)
         {
             //Вектор гравитации:
@@ -116,12 +117,10 @@ public class WallMover : MonoBehaviour
 
     private Vector2 GetInput()
     {
-        // Vector2 input = new Vector2
-        // {
-        //     x = 0,
-        //     y = 1
-        // };
-        angle += Input.GetAxis("Mouse X");
+        float xInput = Input.GetAxis("Mouse Y")/20f;
+        _cameraYRotation += Input.GetAxis("Mouse X");
+        _cameraXRotation += Mathf.Abs(xInput) > 0.01f ? xInput : 0;
+        UpdateCameraRotation();
         return new Vector2(Input.GetAxis("Horizontal"), Input.GetAxis("Vertical"));
     }
 
@@ -155,6 +154,7 @@ public class WallMover : MonoBehaviour
     private void WallCheck(Vector3 move)
     {
         RaycastHit hit;
+
         Ray ray = new Ray(transform.position, move);
         if (Physics.Raycast(ray, out hit, capsule.height))
         {
@@ -168,7 +168,8 @@ public class WallMover : MonoBehaviour
     {
         currentNormal = Vector3.Lerp(currentNormal, groundContactNormal, 10 * Time.deltaTime);
         Vector3 myForward = Vector3.Cross(transform.right, currentNormal);
-        // align character to the new myNormal while keeping the forward direction:
+
+// align character to the new myNormal while keeping the forward direction:
         Quaternion targetRot = Quaternion.LookRotation(myForward, currentNormal);
         transform.rotation = Quaternion.Lerp(transform.rotation, targetRot, 10 * Time.deltaTime);
     }

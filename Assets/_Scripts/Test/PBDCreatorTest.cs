@@ -119,10 +119,10 @@ public class PBDCreatorTest : MonoBehaviour
 
     private void OnGUI()
     {
-        if (GUI.Button(new Rect(0, 30, 100, 30), "Add new unit"))
-        {
-            AddUnit();
-        }
+        // if (GUI.Button(new Rect(0, 30, 100, 30), "Add new unit"))
+        // {
+        //     AddUnit();
+        // }
 
         // GUI.Label(new Rect(0, 60, 400, 30),$"ShaderPass: {_shaderPass}, CameraEvent: {_event.ToString()}");
         // int shaderPass = Mathf.RoundToInt(GUI.HorizontalSlider(new Rect(0, 90, 100, 30), _shaderPass, -1, 4));
