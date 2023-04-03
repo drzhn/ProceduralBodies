@@ -13,7 +13,7 @@ namespace PBD
         public Vector3 this[int index] => _position[index];
 
         // General settings
-        private const int POINTS_AMOUNT = 1024; // we allocate all points data once and use special arrays for existence check
+        private const int POINTS_AMOUNT = 8192; // we allocate all points data once and use special arrays for existence check
         private const int SKELETON_BONES_AMOUNT = 100;
 
         private const int CONNECTION_AMOUNT = 32; // how many connections may have each point
